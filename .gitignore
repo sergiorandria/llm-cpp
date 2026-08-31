@@ -1,0 +1,38 @@
+# Build
+build/
+cmake-build-*/
+out/
+
+# Compiled
+*.o
+*.a
+*.so
+*.out
+*.exe
+llm-cpp
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Data & checkpoints (large)
+data/*.txt
+data/*.bin
+*.bin
+*.gguf
+checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.clangd/
+.cache/
+
+# OS
+.DS_Store
+Thumbs.db
