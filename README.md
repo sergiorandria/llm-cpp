@@ -6,17 +6,17 @@ Implementation of a Large Language Model (LLM) from scratch in C++.
 
 > No frameworks — just C++20, `numpy-cpp` (SIMD, blocked GEMM, PCG64), and Transformer architecture.
 
-## Features (planned)
+## Features
 
-- [x] Tensor & autograd primitives (CPU)
-- [x] BPE Tokenizer (char-level + BPE merges)
-- [x] Multi-Head Self-Attention (causal, KV-cache stub)
-- [x] Transformer Block (Attention + FFN + LayerNorm + Residuals)
-- [x] Autoregressive LLM (GPT-style)
-- [x] Training loop (AdamW, cross-entropy, gradient clipping)
-- [x] Inference with KV-cache & sampling (temperature, top-k, top-p)
-- [x] Checkpoint save & load (binary v1)
-- [x] Minimal dataset loader (TinyStories / Shakespeare) — via Dataset/DataLoader + numpy
+- [x] Tensor primitives (CPU, numpy-cpp GEMM/SIMD when enabled)
+- [x] BPE Tokenizer (char-level + BPE merges, train/encode/decode)
+- [~] Multi-Head Self-Attention (causal; single-GEMM currently, per-head split in progress)
+- [x] Transformer Block (Attention + FFN + LayerNorm + Residuals, SwiGLU)
+- [x] Autoregressive LLM (GPT-style, RoPE/sinusoidal/learned pos)
+- [~] Training loop (forward + loss + AdamW/grad-clip; autograd/backward not yet)
+- [~] Inference sampling (temperature, top-k, top-p, repetition penalty) — KV-cache stub not yet wired
+- [~] Checkpoint save & load (binary header only; weights not yet serialized)
+- [x] Minimal dataset loader (TinyStories / Shakespeare) — via Dataset/DataLoader
 
 ## Quick Start
 
@@ -50,7 +50,8 @@ cmake -B build -DUSE_NUMPY_CPP=OFF
 ### Generate
 
 ```bash
-./build/llm-cpp generate --checkpoint build/model.bin --prompt "Hello, world"
+./build/llm-cpp generate --prompt "Hello, world"
+# --checkpoint is parsed but model still runs from random init until checkpoint I/O lands
 ```
 
 ## Project Structure

@@ -3,6 +3,10 @@
 #include "llm/config.h"
 #include "llm/cli.h"
 #include "llm/version.h"
+#include "llm/dataset.h"
+#include "llm/trainer.h"
+#include "llm/optimizer.h"
+#include "llm/scheduler.h"
 #include <iostream>
 #include <string>
 
@@ -50,7 +54,16 @@ int main(int argc, char* argv[]) {
     std::cout << "[train] config "<<cfg_path<<" data "<<data_path<<" n_layers="<<cfg.n_layers<<"\n";
     llm::GPT model(cfg);
     std::cout<<"[train] model params "<<model.num_parameters()<<"\n";
-    // TODO: Trainer here
+    llm::Dataset ds(data_path, cfg.block_size);
+    std::cout<<"[train] dataset tokens "<<ds.size()<<"\n";
+    llm::AdamW optim(6e-4f);
+    llm::CosineScheduler sched(6e-4f, 100, 5000);
+    llm::TrainConfig tcfg; tcfg.max_iters = 10; // demo: 10 steps so CLI doesn't hang
+    llm::Trainer trainer(model, tcfg, optim, sched);
+    trainer.train(ds);
+    std::string ckpt = args.get("checkpoint", "checkpoints/model.bin");
+    trainer.save_checkpoint(ckpt);
+    std::cout<<"[train] done, saved "<<ckpt<<"\n";
     return 0;
 } else if (cmd == "generate") {
     auto args = llm::parse_args(argc, argv);
@@ -58,15 +71,18 @@ int main(int argc, char* argv[]) {
     float temp = std::stof(args.get("temperature", "1.0"));
     int top_k = std::stoi(args.get("top_k", "0"));
     float top_p = std::stof(args.get("top_p", "1.0"));
+    float rep = std::stof(args.get("repetition_penalty", "1.0"));
     size_t max_tokens = std::stoi(args.get("max_tokens", "50"));
     std::string ckpt = args.get("checkpoint", "");
     llm::Config cfg; cfg.vocab_size=256; cfg.n_layers=2; cfg.n_heads=4; cfg.n_embd=64; cfg.block_size=128;
-    if(!ckpt.empty()) std::cout<<"[generate] would load "<<ckpt<<"\n";
     llm::GPT model(cfg);
+    if(!ckpt.empty()){
+        std::cout<<"[generate] loading "<<ckpt<<"\n";
+        model.load(ckpt);
+    }
     llm::Tokenizer tok(256);
-    (void)top_p;
     auto ids = tok.encode(prompt);
-    auto out = model.generate(ids, max_tokens, temp, top_k);
+    auto out = model.generate(ids, max_tokens, temp, top_k, top_p, rep);
     std::cout << tok.decode(out) << "\n";
     return 0;
     }

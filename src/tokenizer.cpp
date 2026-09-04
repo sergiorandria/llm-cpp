@@ -76,15 +76,18 @@ void Tokenizer::train(const std::string& text, size_t num_merges){
     for(size_t iter=0; iter<num_merges && vocab_.size()<vocab_size_; ++iter){
         std::unordered_map<std::string,int> freq;
         for(size_t i=0;i+1<words.size();++i){
-            std::string pair = words[i] + "\x00" + words[i+1];
+            // Use Unit Separator \x1F (not NUL) — NUL would truncate std::string from C-string literal
+            const std::string SEP = std::string(1, '\x1F');
+            std::string pair = words[i] + SEP + words[i+1];
             freq[pair]++;
         }
         if(freq.empty()) break;
         auto best = std::max_element(freq.begin(), freq.end(),
             [](auto &a, auto &b){return a.second < b.second;});
-        size_t sep = best->first.find("\x00");
+        const std::string SEP = std::string(1, '\x1F');
+        size_t sep = best->first.find(SEP);
         std::string a = best->first.substr(0, sep);
-        std::string b = best->first.substr(sep+1);
+        std::string b = best->first.substr(sep + SEP.size());
         std::string merged = a + b;
         merges_.emplace_back(a,b);
         if(vocab_.find(merged)==vocab_.end()){

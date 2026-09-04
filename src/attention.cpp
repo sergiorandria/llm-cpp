@@ -12,39 +12,51 @@ MultiHeadAttention::MultiHeadAttention(size_t n_embd, size_t n_heads, size_t blo
 }
 
 Tensor MultiHeadAttention::forward(const Tensor& x, bool causal, float dropout_p) const {
-    // x: [T, C]
+    // x: [T, C] where C = n_heads * head_dim; true per-head attention
+    assert(n_embd_ % n_heads_ == 0);
     size_t T = x.shape[0];
-    // Naive: Q = x @ Wq, etc.
-    Tensor Q = x.matmul(Wq_);
+    Tensor Q = x.matmul(Wq_); // [T, C]
     Tensor K = x.matmul(Wk_);
     Tensor V = x.matmul(Wv_);
 
-// True MHA: split Q,K,V into heads, compute per-head attention, concat
-// For simplicity we still use efficient single GEMM but scale by head_dim and note split
-// Head split logic: reshape [T, C] -> [T, n_heads, head_dim] conceptual
-// Here we compute scores as Q @ K^T / sqrt(head_dim) which is mathematically equivalent
-// when Wq/Wk are block-diagonal per head; full split would be per-head GEMM
-Tensor Kt = K.transpose();
-Tensor scores = Q.matmul(Kt); // [T, T]
-// head-aware scale already applied below
-    float scale = 1.0f / std::sqrt((float)head_dim_);
-    for (auto& v : scores.data) v *= scale;
+    auto slice_head = [&](const Tensor& t, size_t h) -> Tensor {
+        Tensor out({T, head_dim_}, 0.0f);
+        size_t base = h * head_dim_;
+        for (size_t i = 0; i < T; ++i)
+            for (size_t j = 0; j < head_dim_; ++j)
+                out(i, j) = t(i, base + j);
+        return out;
+    };
 
-    // Causal mask
-    if(causal){
-        for (size_t i = 0; i < T; ++i) {
-            for (size_t j = i + 1; j < T; ++j) {
-                scores(i, j) = -1e9f;
-            }
+    Tensor out({T, n_embd_}, 0.0f);
+    float scale = 1.0f / std::sqrt((float)head_dim_);
+
+    for (size_t h = 0; h < n_heads_; ++h) {
+        Tensor Qh = slice_head(Q, h);
+        Tensor Kh = slice_head(K, h);
+        Tensor Vh = slice_head(V, h);
+        Tensor Kt = Kh.transpose(); // [head_dim, T]
+        Tensor scores = Qh.matmul(Kt); // [T, T]
+        for (auto& v : scores.data) v *= scale;
+        if (causal) {
+            for (size_t i = 0; i < T; ++i)
+                for (size_t j = i + 1; j < T; ++j)
+                    scores(i, j) = -1e9f;
         }
+        Tensor attn = scores.softmax(1);
+        if (dropout_p > 0.0f) {
+            std::mt19937 rng(123 + h);
+            attn = attn.dropout(dropout_p, rng);
+        }
+        Tensor out_h = attn.matmul(Vh); // [T, head_dim]
+        // concat back
+        size_t base = h * head_dim_;
+        for (size_t i = 0; i < T; ++i)
+            for (size_t j = 0; j < head_dim_; ++j)
+                out(i, base + j) = out_h(i, j);
     }
-Tensor attn = scores.softmax(1); // [T, T]
-if(dropout_p > 0.0f){
-    std::mt19937 rng(123);
-    attn = attn.dropout(dropout_p, rng);
-}
-    Tensor out = attn.matmul(V);     // [T, C]
-    Tensor proj = out.matmul(Wo_);   // [T, C]
+
+    Tensor proj = out.matmul(Wo_); // [T, C]
     return proj;
 }
 

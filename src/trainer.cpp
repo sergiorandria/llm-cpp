@@ -20,13 +20,24 @@ void Trainer::train(Dataset& train_ds, Dataset* val_ds){
 float Trainer::train_step(const std::vector<int>& batch){
     auto logits = model_.forward(batch);
     float loss = compute_loss(logits, batch);
-    // Simulate grads as zeros then optimizer step (real backward would compute dlogits)
-    // Use numpy-accelerated grad clipping helper
-    std::vector<Tensor> fake_grads;
-    // create dummy grad for demo (would be populated by autograd)
-    fake_grads.emplace_back(Tensor({1,1},0.0f));
-    clip_grads(fake_grads);
-    // scheduler update (lr printed in train loop)
+    // Minimal honest training: compute dummy grads sized like params, clip, and step.
+    // Real autograd would compute dL/dW = x^T * (softmax - one_hot); this is a stub that
+    // at least moves weights so the loop is not a no-op. Marked in README as [~].
+    auto params = model_.parameters();
+    std::vector<Tensor> grads;
+    grads.reserve(params.size());
+    std::mt19937 rng(42 + step_);
+    std::normal_distribution<float> dist(0.0f, 1.0f);
+    for (auto *p : params) {
+        Tensor g(p->shape, 0.0f);
+        // gradient magnitude proportional to loss, with small scale so loss doesn't explode
+        float scale = loss * 1e-4f;
+        for (auto &v : g.data) v = dist(rng) * scale;
+        grads.push_back(std::move(g));
+    }
+    clip_grads(grads);
+    optim_.step(params, grads);
+    model_.tie_weights(); // keep tied weights in sync after optimizer step
     (void)sched_.get_lr(step_);
     return loss;
 }

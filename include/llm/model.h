@@ -42,6 +42,11 @@ public:
     void load(const std::string& path);
 
     size_t num_parameters() const;
+    // Expose parameters for optimizer (non-const so optimizer can mutate)
+    std::vector<Tensor*> parameters();
+    std::vector<const Tensor*> parameters() const;
+    // For weight tying: share storage via copy-on-tie (true alias would need shared_ptr)
+    void tie_weights();
 
 private:
     Config config_;
@@ -49,7 +54,7 @@ private:
     Tensor wpe_; // position embedding [block_size, n_embd]
     std::vector<TransformerBlock> blocks_;
     Tensor ln_f_gamma_, ln_f_beta_;
-    Tensor lm_head_; // [vocab, n_embd] or [n_embd, vocab] depending on weight tying
+    Tensor lm_head_; // [n_embd, vocab]
 };
 
 } // namespace llm
