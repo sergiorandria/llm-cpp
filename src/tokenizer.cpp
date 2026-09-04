@@ -52,7 +52,7 @@ void Tokenizer::load(const std::string& path) {
 
 void Tokenizer::save(const std::string& path) const {
     std::ofstream out(path);
-    (void)out;
+    for(auto &m: merges_) out<<m.first<<" "<<m.second<<"\n";
 }
 
 } // namespace llm
