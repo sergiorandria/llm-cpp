@@ -20,6 +20,7 @@ public:
     static constexpr int UNK = 3;
 
     void load(const std::string& path);
+    void train(const std::string& text, size_t num_merges);
     void save(const std::string& path) const;
 
     // BPE merges

@@ -50,6 +50,14 @@ void Tokenizer::load(const std::string& path) {
     }
 }
 
+void Tokenizer::train(const std::string& text, size_t num_merges){
+    // Very naive BPE train: count adjacent pairs and merge most frequent
+    (void)text; (void)num_merges;
+    // placeholder: add dummy merges for demo
+    for(size_t i=0;i<num_merges && vocab_.size()<vocab_size_; ++i){
+        merges_.emplace_back("a","b");
+    }
+}
 void Tokenizer::save(const std::string& path) const {
     std::ofstream out(path);
     for(auto &m: merges_) out<<m.first<<" "<<m.second<<"\n";
