@@ -13,11 +13,26 @@ Tokenizer::Tokenizer(size_t vocab_size) : vocab_size_(vocab_size) {
 }
 
 std::vector<int> Tokenizer::encode(const std::string& text) const {
-    // Placeholder: char-level encoding (0-255). Replace with BPE training.
+    // BPE encode: start from char ids, then apply merges greedily
+    std::vector<std::string> tokens;
+    tokens.reserve(text.size());
+    for (unsigned char c : text) tokens.emplace_back(1, char(c));
+    // apply merges in order learned
+    for (auto &mer: merges_) {
+        std::string merged = mer.first + mer.second;
+        for (size_t i = 0; i + 1 < tokens.size(); ) {
+            if (tokens[i] == mer.first && tokens[i+1] == mer.second) {
+                tokens[i] = merged;
+                tokens.erase(tokens.begin() + i + 1);
+            } else ++i;
+        }
+    }
     std::vector<int> ids;
-    ids.reserve(text.size());
-    for (unsigned char c : text) {
-        ids.push_back(static_cast<int>(c) % (int)vocab_size_);
+    ids.reserve(tokens.size());
+    for (auto &tok : tokens) {
+        auto it = vocab_.find(tok);
+        if (it != vocab_.end()) ids.push_back(it->second);
+        else ids.push_back(UNK % (int)vocab_size_);
     }
     return ids;
 }
