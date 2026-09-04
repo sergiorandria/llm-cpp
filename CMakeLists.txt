@@ -36,6 +36,8 @@ endif()
 
 file(GLOB SOURCES "src/*.cpp")
 # Note: new modules auto-included via glob
+# Exclude examples from main target (they are separate)
+list(FILTER SOURCES EXCLUDE REGEX ".*examples/.*")
 
 add_executable(llm-cpp ${SOURCES})
 
