@@ -3,6 +3,7 @@
 #include "dataset.h"
 #include "optimizer.h"
 #include "scheduler.h"
+#include "numpy_utils.h"
 #include <string>
 namespace llm {
 struct TrainConfig {
