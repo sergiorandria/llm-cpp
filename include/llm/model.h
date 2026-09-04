@@ -6,6 +6,8 @@
 
 namespace llm {
 
+enum class PosEncoding { Learned, Sinusoidal, RoPE };
+
 struct Config {
     size_t vocab_size = 50257;
     size_t n_layers = 12;
@@ -14,6 +16,8 @@ struct Config {
     size_t block_size = 1024;
     float dropout = 0.0f;
     bool bias = false;
+    PosEncoding pos_encoding = PosEncoding::Learned;
+    bool weight_tying = true;
 };
 
 class GPT {
