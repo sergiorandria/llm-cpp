@@ -34,8 +34,20 @@ std::string Tokenizer::decode(const std::vector<int>& ids) const {
 
 void Tokenizer::load(const std::string& path) {
     std::ifstream in(path);
-    // TODO: load BPE merges & vocab
-    (void)in;
+    std::string line;
+    while(std::getline(in, line)){
+        if(line.empty() || line[0]=='#') continue;
+        size_t sp = line.find(' ');
+        if(sp==std::string::npos) continue;
+        std::string a=line.substr(0,sp), b=line.substr(sp+1);
+        merges_.emplace_back(a,b);
+        std::string merged=a+b;
+        if(vocab_.find(merged)==vocab_.end() && vocab_.size()<vocab_size_){
+            int id=(int)vocab_.size();
+            vocab_[merged]=id;
+            inv_vocab_[id]=merged;
+        }
+    }
 }
 
 void Tokenizer::save(const std::string& path) const {
