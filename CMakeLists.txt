@@ -42,3 +42,8 @@ message(STATUS "C++ flags: ${CMAKE_CXX_FLAGS}")
 
 install(TARGETS llm-cpp DESTINATION bin)
 install(DIRECTORY include/ DESTINATION include)
+
+enable_testing()
+if(BUILD_TESTS)
+  add_subdirectory(tests)
+endif()
