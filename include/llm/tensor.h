@@ -6,6 +6,13 @@
 #include <random>
 #include <cmath>
 
+#ifdef USE_NUMPY_CPP
+#include <np/np.hpp>
+#include <np/linalg.hpp>
+#include <np/random.hpp>
+#include <np/statistics.hpp>
+#endif
+
 namespace llm {
 
 class Tensor {
@@ -47,6 +54,15 @@ public:
     static Tensor ones(std::vector<size_t> shape) { return Tensor(shape, 1.0f); }
     void print(const std::string& name="") const;
     std::vector<size_t> get_shape() const { return shape; }
+
+#ifdef USE_NUMPY_CPP
+    // ── numpy-cpp interop ───────────────────────────────────────────────
+    np::ndarray<float> to_ndarray() const;
+    static Tensor from_ndarray(const np::ndarray<float>& arr);
+    // accelerated ops via numpy-cpp (SIMD, blocked GEMM, threading)
+    Tensor matmul_np(const Tensor& other) const;
+    void randn_np(float mean = 0.0f, float std = 0.02f, uint64_t seed = 42);
+#endif
 
 private:
     void compute_strides();

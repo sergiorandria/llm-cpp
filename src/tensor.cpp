@@ -2,6 +2,12 @@
 #include <stdexcept>
 #include <iostream>
 
+#ifdef USE_NUMPY_CPP
+#include <np/np.hpp>
+#include <np/linalg.hpp>
+#include <np/random.hpp>
+#endif
+
 namespace llm {
 
 Tensor::Tensor(std::vector<size_t> shape_, float fill) : shape(std::move(shape_)) {
@@ -26,10 +32,60 @@ void Tensor::compute_strides() {
 }
 
 void Tensor::randn(float mean, float std) {
+#ifdef USE_NUMPY_CPP
+    randn_np(mean, std, 42);
+#else
     std::mt19937 rng(42);
     std::normal_distribution<float> dist(mean, std);
     for (auto& v : data) v = dist(rng);
+#endif
 }
+
+#ifdef USE_NUMPY_CPP
+np::ndarray<float> Tensor::to_ndarray() const {
+    std::vector<int> np_shape;
+    np_shape.reserve(shape.size());
+    for (auto s : shape) np_shape.push_back(static_cast<int>(s));
+    // np::ndarray expects vector<int> shape
+    if (np_shape.empty()) np_shape = {1};
+    auto arr = np::zeros<float>(np_shape);
+    // copy data (contiguous C-order)
+    size_t n = std::min<size_t>(data.size(), arr.size());
+    std::copy(data.begin(), data.begin() + n, arr.data().begin());
+    return arr;
+}
+
+Tensor Tensor::from_ndarray(const np::ndarray<float>& arr) {
+    std::vector<size_t> s;
+    s.reserve(arr.shape.size());
+    for (auto d : arr.shape) s.push_back(static_cast<size_t>(d));
+    Tensor t(s, 0.0f);
+    size_t n = std::min<size_t>(t.data.size(), arr.size());
+    std::copy(arr.data().begin(), arr.data().begin() + n, t.data.begin());
+    return t;
+}
+
+Tensor Tensor::matmul_np(const Tensor& other) const {
+    auto a = to_ndarray();
+    auto b = other.to_ndarray();
+    // np::linalg::matmul uses blocked GEMM + SIMD + threading
+    auto c = np::linalg::matmul(a, b);
+    return from_ndarray(c);
+}
+
+void Tensor::randn_np(float mean, float std, uint64_t seed) {
+    // Use np::random::Generator (PCG64) -> standard_normal then scale
+    np::random::Generator rng(seed);
+    std::vector<int> np_shape;
+    for (auto s : shape) np_shape.push_back(static_cast<int>(s));
+    if (np_shape.empty()) np_shape = {1};
+    auto arr = rng.standard_normal<float>(np_shape);
+    // arr is N(0,1), scale to mean/std
+    for (size_t i = 0; i < data.size() && i < arr.size(); ++i) {
+        data[i] = arr.data()[i] * std + mean;
+    }
+}
+#endif
 
 float& Tensor::operator()(size_t i, size_t j) {
     assert(shape.size() == 2);
@@ -41,6 +97,12 @@ const float& Tensor::operator()(size_t i, size_t j) const {
 }
 
 Tensor Tensor::matmul(const Tensor& other) const {
+#ifdef USE_NUMPY_CPP
+    // Accelerated via numpy-cpp blocked GEMM (SIMD + threading)
+    assert(shape.size() == 2 && other.shape.size() == 2);
+    assert(shape[1] == other.shape[0]);
+    return matmul_np(other);
+#else
     // OpenMP parallelized when available
     assert(shape.size() == 2 && other.shape.size() == 2);
     assert(shape[1] == other.shape[0]);
@@ -57,6 +119,7 @@ Tensor Tensor::matmul(const Tensor& other) const {
         }
     }
     return out;
+#endif
 }
 
 Tensor Tensor::transpose() const {
