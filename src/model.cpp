@@ -2,6 +2,7 @@
 #include <cmath>
 #include <random>
 #include <iostream>
+#include "llm/sampling.h"
 #include <fstream>
 
 namespace llm {
