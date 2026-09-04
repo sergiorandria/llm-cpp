@@ -39,3 +39,6 @@ endif()
 
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ flags: ${CMAKE_CXX_FLAGS}")
+
+install(TARGETS llm-cpp DESTINATION bin)
+install(DIRECTORY include/ DESTINATION include)
