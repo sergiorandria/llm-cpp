@@ -1,5 +1,6 @@
 #include "llm/tensor.h"
 #include <stdexcept>
+#include <iostream>
 
 namespace llm {
 
@@ -101,4 +102,51 @@ Tensor Tensor::layernorm(float eps) const {
     return out;
 }
 
+Tensor Tensor::add(const Tensor& other) const {
+    assert(shape == other.shape);
+    Tensor out(shape, 0.0f);
+    for (size_t i=0;i<data.size();++i) out.data[i]=data[i]+other.data[i];
+    return out;
+}
+Tensor Tensor::sub(const Tensor& other) const {
+    assert(shape == other.shape);
+    Tensor out(shape, 0.0f);
+    for (size_t i=0;i<data.size();++i) out.data[i]=data[i]-other.data[i];
+    return out;
+}
+Tensor Tensor::mul(const Tensor& other) const {
+    assert(shape == other.shape);
+    Tensor out(shape, 0.0f);
+    for (size_t i=0;i<data.size();++i) out.data[i]=data[i]*other.data[i];
+    return out;
+}
+Tensor Tensor::scale(float s) const {
+    Tensor out(shape, 0.0f);
+    for (size_t i=0;i<data.size();++i) out.data[i]=data[i]*s;
+    return out;
+}
+Tensor Tensor::gelu() const {
+    Tensor out(shape, 0.0f);
+    for (size_t i=0;i<data.size();++i){
+        float x=data[i];
+        out.data[i]=0.5f*x*(1.0f+std::tanh(std::sqrt(2.0f/3.14159265f)*(x+0.044715f*x*x*x)));
+    }
+    return out;
+}
+Tensor Tensor::silu() const {
+    Tensor out(shape, 0.0f);
+    for (size_t i=0;i<data.size();++i){
+        float x=data[i];
+        out.data[i]=x/(1.0f+std::exp(-x));
+    }
+    return out;
+}
+void Tensor::print(const std::string& name) const {
+    if(!name.empty()) std::cout<<name<<" ";
+    std::cout<<"shape[";
+    for(size_t i=0;i<shape.size();++i){ std::cout<<shape[i]<<(i+1<shape.size()?",":""); }
+    std::cout<<"] data[0]="<<(data.empty()?0:data[0])<<"\n";
+}
+
 } // namespace llm
+
