@@ -4,9 +4,11 @@
 
 namespace llm {
 
+struct TransformerConfig { bool pre_ln = true; float dropout=0.0f; };
+
 class TransformerBlock {
 public:
-    TransformerBlock(size_t n_embd, size_t n_heads, size_t block_size);
+    TransformerBlock(size_t n_embd, size_t n_heads, size_t block_size, TransformerConfig cfg = {});
 
     Tensor forward(const Tensor& x) const;
 

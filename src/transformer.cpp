@@ -24,9 +24,11 @@ Tensor FeedForward::forward(const Tensor& x) const {
     return out;
 }
 
-TransformerBlock::TransformerBlock(size_t n_embd, size_t n_heads, size_t block_size)
+TransformerBlock::TransformerBlock(size_t n_embd, size_t n_heads, size_t block_size, TransformerConfig cfg)
     : attn_(n_embd, n_heads, block_size),
-      ffn_(n_embd),
+      ffn_(n_embd), // cfg unused yet
+      // cfg dropout stored if needed
+
       ln1_gamma_({n_embd}, 1.0f), ln1_beta_({n_embd}, 0.0f),
       ln2_gamma_({n_embd}, 1.0f), ln2_beta_({n_embd}, 0.0f) {}
 
