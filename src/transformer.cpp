@@ -33,6 +33,7 @@ TransformerBlock::TransformerBlock(size_t n_embd, size_t n_heads, size_t block_s
       ln2_gamma_({n_embd}, 1.0f), ln2_beta_({n_embd}, 0.0f) {}
 
 Tensor TransformerBlock::forward(const Tensor& x) const {
+    // dropout would be applied after attn and ffn if cfg.dropout >0
     // Pre-LN transformer
     Tensor ln1 = x.layernorm();
     Tensor attn_out = attn_.forward(ln1);
