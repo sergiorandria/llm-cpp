@@ -38,9 +38,11 @@ Tensor scores = Q.matmul(Kt); // [T, T]
             }
         }
     }
-    (void)dropout_p; // TODO: apply dropout on attn
-
-    Tensor attn = scores.softmax(1); // [T, T]
+Tensor attn = scores.softmax(1); // [T, T]
+if(dropout_p > 0.0f){
+    std::mt19937 rng(123);
+    attn = attn.dropout(dropout_p, rng);
+}
     Tensor out = attn.matmul(V);     // [T, C]
     Tensor proj = out.matmul(Wo_);   // [T, C]
     return proj;
