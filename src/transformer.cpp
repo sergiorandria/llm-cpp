@@ -15,6 +15,17 @@ FeedForward::FeedForward(size_t n_embd, size_t hidden_dim, bool bias, Activation
 }
 
 Tensor FeedForward::forward(const Tensor& x) const {
+    if(act_ == Activation::SILU){
+        // SwiGLU: silu(x @ W1) * (x @ W3) @ W2  (gated)
+        Tensor h1 = x.matmul(W1_);
+        Tensor h3 = x.matmul(W3_);
+        // silu on h1
+        for(size_t i=0;i<h1.data.size();++i) h1.data[i] = h1.data[i] / (1.0f + std::exp(-h1.data[i]));
+        // gate
+        Tensor gated = h1.mul(h3);
+        Tensor out = gated.matmul(W2_);
+        return out;
+    }
     Tensor h = x.matmul(W1_); // [T, 4*C]
     // GELU approx (tanh)
     for (auto& v : h.data) {
