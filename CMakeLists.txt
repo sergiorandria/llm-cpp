@@ -18,6 +18,7 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g -DNDEBUG")
 include_directories(include)
 
 file(GLOB SOURCES "src/*.cpp")
+# Note: new modules auto-included via glob
 
 add_executable(llm-cpp ${SOURCES})
 
