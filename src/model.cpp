@@ -57,6 +57,7 @@ Tensor GPT::forward(const std::vector<int>& tokens) const {
             x(t, j) = wte_(tok, j) + wpe_(t, j);
         }
     }
+    if(config_.pos_encoding == PosEncoding::RoPE) x = rope(x, T);
     for (auto& block : blocks_) {
         x = block.forward(x);
     }
