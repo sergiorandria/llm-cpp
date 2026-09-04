@@ -39,9 +39,10 @@ std::vector<int> Tokenizer::encode(const std::string& text) const {
 
 std::string Tokenizer::decode(const std::vector<int>& ids) const {
     std::string s;
-    s.reserve(ids.size());
     for (int id : ids) {
-        if (id >= 0 && id < 256) s.push_back(static_cast<char>(id));
+        auto it = inv_vocab_.find(id);
+        if (it != inv_vocab_.end()) s += it->second;
+        else if (id >=0 && id < 256) s.push_back(char(id));
         else s.push_back('?');
     }
     return s;
