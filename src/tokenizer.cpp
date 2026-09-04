@@ -4,7 +4,7 @@
 namespace llm {
 
 Tokenizer::Tokenizer(size_t vocab_size) : vocab_size_(vocab_size) {
-    // init char vocab 0-255 mapped
+    // init byte-level vocab 0-255 mapped (GPT-2 style)
     for(int i=0;i<256 && i<(int)vocab_size_; ++i){
         std::string s(1, char(i));
         vocab_[s]=i;
