@@ -50,21 +50,23 @@ int main(int argc, char* argv[]) {
     std::cout<<"[train] model params "<<model.num_parameters()<<"\n";
     // TODO: Trainer here
     return 0;
-    } else if (cmd == "generate") {
-        llm::Config cfg;
-        cfg.vocab_size = 256;
-        cfg.n_layers = 2;
-        cfg.n_heads = 4;
-        cfg.n_embd = 64;
-        cfg.block_size = 128;
-        llm::GPT model(cfg);
-        llm::Tokenizer tok(256);
-        std::string prompt = argc > 3 ? argv[3] : "Hello";
-        size_t max_tokens = 50;
-        auto ids = tok.encode(prompt);
-        auto out = model.generate(ids, max_tokens);
-        std::cout << tok.decode(out) << "\n";
-        return 0;
+} else if (cmd == "generate") {
+    auto args = llm::parse_args(argc, argv);
+    std::string prompt = args.get("prompt", "Hello");
+    float temp = std::stof(args.get("temperature", "1.0"));
+    int top_k = std::stoi(args.get("top_k", "0"));
+    float top_p = std::stof(args.get("top_p", "1.0"));
+    size_t max_tokens = std::stoi(args.get("max_tokens", "50"));
+    std::string ckpt = args.get("checkpoint", "");
+    llm::Config cfg; cfg.vocab_size=256; cfg.n_layers=2; cfg.n_heads=4; cfg.n_embd=64; cfg.block_size=128;
+    if(!ckpt.empty()) std::cout<<"[generate] would load "<<ckpt<<"\n";
+    llm::GPT model(cfg);
+    llm::Tokenizer tok(256);
+    (void)top_p;
+    auto ids = tok.encode(prompt);
+    auto out = model.generate(ids, max_tokens, temp, top_k);
+    std::cout << tok.decode(out) << "\n";
+    return 0;
     }
 
     print_usage(argv[0]);
