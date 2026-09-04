@@ -2,10 +2,12 @@
 #include "llm/tokenizer.h"
 #include "llm/config.h"
 #include "llm/cli.h"
+#include "llm/version.h"
 #include <iostream>
 #include <string>
 
 void print_usage(const char* prog) {
+    std::cout << "llm-cpp v" << LLM_CPP_VERSION << "\n";
     std::cout << "Usage: " << prog << " [train|generate] [options]\n"
               << "  train    --config <path> --data <path>\n"
               << "  generate --prompt <text> [--max_tokens 100]\n"
