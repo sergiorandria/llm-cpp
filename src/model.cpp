@@ -14,6 +14,7 @@ GPT::GPT(const Config& config) : config_(config),
     wte_.randn(0, 0.02f);
     wpe_.randn(0, 0.02f);
     lm_head_.randn(0, 0.02f);
+    if(config_.weight_tying){ /* tie wte and lm_head if shapes match: not applied in naive impl */ }
     blocks_.reserve(config.n_layers);
     for (size_t i = 0; i < config.n_layers; ++i) {
         blocks_.emplace_back(config.n_embd, config.n_heads, config.block_size);
