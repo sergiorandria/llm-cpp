@@ -29,7 +29,8 @@ Implementation of a Large Language Model (LLM) from scratch in C++.
 ### Build
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release
+# Install
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
 cmake --build build -j
 ./build/llm-cpp --help
 ```
