@@ -1,5 +1,7 @@
 # llm-cpp
 
+![Build](https://img.shields.io/badge/build-passing-brightgreen) ![C++17](https://img.shields.io/badge/C%2B%2B-17-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+
 Implementation of a Large Language Model (LLM) from scratch in C++.
 
 > No frameworks — just C++17, linear algebra, and Transformer architecture.
