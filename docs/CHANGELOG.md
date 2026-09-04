@@ -6,3 +6,5 @@
 
 ## Unreleased
 - RoPE, SwiGLU, KV-cache, Beam search stubs
+
+- Fix streaming include
