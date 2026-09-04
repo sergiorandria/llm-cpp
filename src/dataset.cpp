@@ -6,9 +6,14 @@ namespace llm {
 Dataset::Dataset(const std::string& path, size_t block_size): block_size_(block_size){
     std::ifstream in(path);
     std::string text((std::istreambuf_iterator<char>(in)), {});
-    if(text.empty()) text="hello world\n";
+    if(text.empty()){
+        // try generate tiny shakespeare stub, still use tokenizer
+        text="To be, or not to be, that is the question.\n";
+        for(int i=0;i<10;++i) text+=text;
+    }
     Tokenizer tok;
     tokens_=tok.encode(text);
+    if(tokens_.empty()) tokens_.assign(256,0);
 }
 std::vector<int> Dataset::get_batch(size_t idx, size_t batch_size) const {
     std::vector<int> batch;
