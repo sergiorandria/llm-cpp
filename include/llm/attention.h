@@ -13,6 +13,9 @@ public:
     size_t n_heads_;
     size_t n_embd_;
     size_t head_dim_;
+    // KV-cache for inference
+    mutable std::vector<Tensor> k_cache_, v_cache_;
+    void clear_cache() const { k_cache_.clear(); v_cache_.clear(); }
 private:
     Tensor Wq_, Wk_, Wv_, Wo_;
     Tensor bq_, bk_, bv_, bo_;
