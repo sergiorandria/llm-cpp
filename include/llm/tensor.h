@@ -31,9 +31,17 @@ public:
     Tensor transpose() const;
     Tensor softmax(int dim = -1) const;
     Tensor layernorm(float eps = 1e-5f) const;
+    Tensor add(const Tensor& other) const;
+    Tensor sub(const Tensor& other) const;
+    Tensor mul(const Tensor& other) const; // elementwise
+    Tensor scale(float s) const;
+    Tensor gelu() const;
+    Tensor silu() const;
 
     static Tensor zeros(std::vector<size_t> shape) { return Tensor(shape, 0.0f); }
     static Tensor ones(std::vector<size_t> shape) { return Tensor(shape, 1.0f); }
+    void print(const std::string& name="") const;
+    std::vector<size_t> get_shape() const { return shape; }
 
 private:
     void compute_strides();
