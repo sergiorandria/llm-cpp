@@ -38,6 +38,8 @@ public:
     Tensor gelu() const;
     Tensor silu() const;
     Tensor dropout(float p, std::mt19937& rng) const;
+    float cross_entropy(const Tensor& target) const; // assume logits
+    size_t argmax(size_t row) const;
 
     static Tensor zeros(std::vector<size_t> shape) { return Tensor(shape, 0.0f); }
     static Tensor ones(std::vector<size_t> shape) { return Tensor(shape, 1.0f); }

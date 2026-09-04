@@ -151,6 +151,28 @@ Tensor Tensor::dropout(float p, std::mt19937& rng) const {
     }
     return out;
 }
+float Tensor::cross_entropy(const Tensor& target) const {
+    // naive: this = logits [N, V], target = indices [N] stored as shape [N,1] or [N]
+    assert(shape.size()==2);
+    float loss=0;
+    for(size_t i=0;i<shape[0];++i){
+        float maxv = (*this)(i,0);
+        for(size_t j=1;j<shape[1];++j) maxv = std::max(maxv, (*this)(i,j));
+        float sum=0;
+        for(size_t j=0;j<shape[1];++j) sum+= std::exp((*this)(i,j)-maxv);
+        // target assumed one-hot? For now target.data[i] is class id if target numel==shape0
+        int tgt = (int)target.data[i % target.data.size()];
+        float logp = (*this)(i,tgt)-maxv - std::log(sum);
+        loss -= logp;
+    }
+    return loss / shape[0];
+}
+size_t Tensor::argmax(size_t row) const {
+    assert(row < shape[0]);
+    size_t best=0; float bestv=(*this)(row,0);
+    for(size_t j=1;j<shape[1];++j) if((*this)(row,j) > bestv){ bestv=(*this)(row,j); best=j; }
+    return best;
+}
 void Tensor::print(const std::string& name) const {
     if(!name.empty()) std::cout<<name<<" ";
     std::cout<<"shape[";
