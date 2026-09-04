@@ -45,7 +45,7 @@ Tensor GPT::forward(const std::vector<int>& tokens) const {
 }
 
 std::vector<int> GPT::generate(const std::vector<int>& prompt, size_t max_new_tokens,
-                               float temperature, int top_k) const {
+                               float temperature, int top_k, float top_p, float rep_penalty) const {
     std::vector<int> out = prompt;
     std::mt19937 rng(42);
     for (size_t step = 0; step < max_new_tokens; ++step) {
@@ -92,6 +92,11 @@ void GPT::save(const std::string& path) const {
     std::cout << "[save] would write checkpoint to " << path << " (" << num_parameters() << " params)\n";
 }
 
+std::vector<int> GPT::generate_streaming(const std::vector<int>& prompt, size_t max_new_tokens, std::function<void(int)> cb) const {
+    auto out = generate(prompt, max_new_tokens);
+    for(size_t i=prompt.size(); i<out.size(); ++i) cb(out[i]);
+    return out;
+}
 void GPT::load(const std::string& path) {
     std::cout << "[load] would load checkpoint from " << path << "\n";
 }
