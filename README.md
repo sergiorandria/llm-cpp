@@ -1,10 +1,10 @@
 # llm-cpp
 
-![Build](https://img.shields.io/badge/build-passing-brightgreen) ![C++17](https://img.shields.io/badge/C%2B%2B-17-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Build](https://img.shields.io/badge/build-passing-brightgreen) ![C++20](https://img.shields.io/badge/C%2B%2B-20-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![numpy-cpp](https://img.shields.io/badge/backend-numpy--cpp%20SIMD-orange)
 
 Implementation of a Large Language Model (LLM) from scratch in C++.
 
-> No frameworks — just C++17, linear algebra, and Transformer architecture.
+> No frameworks — just C++20, `numpy-cpp` (SIMD, blocked GEMM, PCG64), and Transformer architecture.
 
 ## Features (planned)
 
@@ -22,17 +22,23 @@ Implementation of a Large Language Model (LLM) from scratch in C++.
 
 ### Requirements
 
-- CMake >= 3.16
-- C++17 compiler (g++ >= 9 / clang++ >= 10)
+- CMake >= 3.20
+- C++20 compiler (g++ >= 11 / clang++ >= 15)
 - Make / Ninja
+- Optional: [numpy-cpp](https://github.com/sergiorandria/numpy-cpp) (auto-fetched, or local at `/home/sergio/Project/numpy-cpp`) — provides SIMD (SSE4.2/AVX2/NEON), blocked GEMM, PCG64
 
 ### Build
 
 ```bash
-# Install
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+# With numpy-cpp accelerated backend (default, C++20 + SIMD + OpenMP)
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DUSE_NUMPY_CPP=ON -DBUILD_TESTS=ON
 cmake --build build -j
 ./build/llm-cpp --help
+ctest --test-dir build  # 5/5 including numpy_backend
+./build/tests/test_numpy_backend  # demo: matmul, randn, transpose via np
+
+# Disable numpy-cpp (fallback naive CPU)
+cmake -B build -DUSE_NUMPY_CPP=OFF
 ```
 
 ### Train (example)
