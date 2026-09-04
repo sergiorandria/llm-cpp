@@ -11,6 +11,7 @@ namespace llm {
 class Tensor {
 public:
     std::vector<float> data;
+    std::vector<float> grad; // for autograd stub
     std::vector<size_t> shape;
     std::vector<size_t> strides;
 
@@ -21,6 +22,7 @@ public:
     size_t ndim() const { return shape.size(); }
 
     void fill(float v) { std::fill(data.begin(), data.end(), v); }
+    void zero_grad(){ if(grad.size()!=data.size()) grad.assign(data.size(),0.0f); else std::fill(grad.begin(), grad.end(), 0.0f); }
     void randn(float mean = 0.0f, float std = 0.02f);
 
     float& operator()(size_t i, size_t j);
