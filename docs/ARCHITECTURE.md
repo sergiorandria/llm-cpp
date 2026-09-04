@@ -12,3 +12,6 @@ Each block: Pre-LN -> Attention (causal) -> Residual -> Pre-LN -> FFN -> Residua
 - Attention: single-head skeleton, multi-head split TODO
 - FFN: GELU, SwiGLU optional
 - PosEncoding: Learned, Sinusoidal, RoPE
+
+## Backend
+`llm::Tensor` is the acceleration point: `to_ndarray()`/`from_ndarray()` bridge to `np::ndarray<float>`. All GEMMs go through `np::linalg::matmul` (blocked, SIMD, threading). See `docs/NUMPY_BACKEND.md`.
