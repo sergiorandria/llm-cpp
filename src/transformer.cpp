@@ -44,15 +44,14 @@ TransformerBlock::TransformerBlock(size_t n_embd, size_t n_heads, size_t block_s
       ln2_gamma_({n_embd}, 1.0f), ln2_beta_({n_embd}, 0.0f) {}
 
 Tensor TransformerBlock::forward(const Tensor& x) const {
-    // dropout would be applied after attn and ffn if cfg.dropout >0
-    // Pre-LN transformer
-    Tensor ln1 = x.layernorm();
+    // Pre-LN transformer with gamma/beta (numpy accelerated layernorm)
+    Tensor ln1 = x.layernorm(&ln1_gamma_, &ln1_beta_);
     Tensor attn_out = attn_.forward(ln1);
     // residual
     Tensor y(x.shape, 0.0f);
     for (size_t i = 0; i < y.data.size(); ++i) y.data[i] = x.data[i] + attn_out.data[i];
 
-    Tensor ln2 = y.layernorm();
+    Tensor ln2 = y.layernorm(&ln2_gamma_, &ln2_beta_);
     Tensor ffn_out = ffn_.forward(ln2);
     Tensor out(y.shape, 0.0f);
     for (size_t i = 0; i < out.data.size(); ++i) out.data[i] = y.data[i] + ffn_out.data[i];
