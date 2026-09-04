@@ -87,6 +87,7 @@ if (temperature != 1.0f) {
     for (auto& v : last_logits) v /= temperature;
 }
 
+int next_id = 0;
 // top-p handling after temperature
 if(top_p < 1.0f && top_k==0){
     next_id = sample_top_p(last_logits, top_p, 1.0f);
