@@ -36,3 +36,5 @@ checkpoints/
 # OS
 .DS_Store
 Thumbs.db
+
+# checkpoints already ignored
