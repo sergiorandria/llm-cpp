@@ -37,6 +37,7 @@ public:
     Tensor scale(float s) const;
     Tensor gelu() const;
     Tensor silu() const;
+    Tensor dropout(float p, std::mt19937& rng) const;
 
     static Tensor zeros(std::vector<size_t> shape) { return Tensor(shape, 0.0f); }
     static Tensor ones(std::vector<size_t> shape) { return Tensor(shape, 1.0f); }

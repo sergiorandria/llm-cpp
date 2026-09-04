@@ -141,6 +141,16 @@ Tensor Tensor::silu() const {
     }
     return out;
 }
+Tensor Tensor::dropout(float p, std::mt19937& rng) const {
+    if(p==0.0f) return *this;
+    Tensor out(shape, 0.0f);
+    std::bernoulli_distribution dist(1.0-p);
+    float scale = 1.0f/(1.0f-p);
+    for(size_t i=0;i<data.size();++i){
+        out.data[i]= dist(rng) ? data[i]*scale : 0.0f;
+    }
+    return out;
+}
 void Tensor::print(const std::string& name) const {
     if(!name.empty()) std::cout<<name<<" ";
     std::cout<<"shape[";
