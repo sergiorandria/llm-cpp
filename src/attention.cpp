@@ -19,7 +19,9 @@ Tensor MultiHeadAttention::forward(const Tensor& x, bool causal, float dropout_p
     Tensor K = x.matmul(Wk_);
     Tensor V = x.matmul(Wv_);
 
-    // Scaled dot-product attention (single head for skeleton; split heads properly in full impl)
+    // TODO: split into n_heads: reshape [T,C] -> [T, n_heads, head_dim] for true MHA
+    // Currently skeleton single-head matmul for brevity; see docs/ARCHITECTURE.md
+    // Scaled dot-product attention
     // scores = Q @ K^T / sqrt(head_dim)
     Tensor Kt = K.transpose();
     Tensor scores = Q.matmul(Kt); // [T, T]
