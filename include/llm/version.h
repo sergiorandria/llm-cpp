@@ -1,0 +1,5 @@
+#pragma once
+#define LLM_CPP_VERSION "0.1.0"
+#define LLM_CPP_VERSION_MAJOR 0
+#define LLM_CPP_VERSION_MINOR 1
+#define LLM_CPP_VERSION_PATCH 0
