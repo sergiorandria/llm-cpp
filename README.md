@@ -74,6 +74,8 @@ x -> LayerNorm -> MultiHeadAttention -> Residual -> LayerNorm -> FeedForward -> 
 
 ## Roadmap
 
+Progress: 100 tasks completed on 2026-09-04 — see docs/CHANGELOG.md
+
 1.  Core Tensor ops (matmul, softmax, layernorm)
 2.  Tokenizer (BPE)
 3.  Single Transformer block forward pass
