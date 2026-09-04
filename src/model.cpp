@@ -19,6 +19,11 @@ GPT::GPT(const Config& config) : config_(config),
     }
 }
 
+static Tensor rope(const Tensor& x, size_t seq_len){
+    // Stub RoPE: return x unchanged (real impl rotates pairs)
+    (void)seq_len;
+    return x;
+}
 Tensor GPT::forward(const std::vector<int>& tokens) const {
     size_t T = tokens.size();
     assert(T <= config_.block_size);
