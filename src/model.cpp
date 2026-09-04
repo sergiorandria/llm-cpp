@@ -13,8 +13,19 @@ GPT::GPT(const Config& config) : config_(config),
     lm_head_({config.n_embd, config.vocab_size}) {
     wte_.randn(0, 0.02f);
     wpe_.randn(0, 0.02f);
-    lm_head_.randn(0, 0.02f);
-    if(config_.weight_tying){ /* tie wte and lm_head if shapes match: not applied in naive impl */ }
+lm_head_.randn(0, 0.02f);
+if(config_.weight_tying && wte_.shape == lm_head_.shape){
+    // tie: share storage (copy for stub, real would alias)
+    lm_head_.data = wte_.data;
+}
+if(config_.pos_encoding == PosEncoding::Sinusoidal){
+    // fill wpe with sinusoidal
+    for(size_t pos=0; pos<config_.block_size; ++pos)
+        for(size_t i=0;i<config_.n_embd;++i){
+            float angle = pos / std::pow(10000.0f, 2*(i/2)/(float)config_.n_embd);
+            wpe_(pos,i) = (i%2==0) ? std::sin(angle) : std::cos(angle);
+        }
+}
     blocks_.reserve(config.n_layers);
     for (size_t i = 0; i < config.n_layers; ++i) {
         blocks_.emplace_back(config.n_embd, config.n_heads, config.block_size);
