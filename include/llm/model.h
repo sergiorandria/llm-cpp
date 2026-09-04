@@ -32,6 +32,8 @@ public:
                               float temperature = 1.0f, int top_k = 0) const;
 
     void save(const std::string& path) const;
+    void save_binary(const std::string& path) const;
+    void load_binary(const std::string& path);
     void load(const std::string& path);
 
     size_t num_parameters() const;
