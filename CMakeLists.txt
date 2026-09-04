@@ -24,6 +24,8 @@ if(USE_NUMPY_CPP)
     if(EXISTS "/home/sergio/Project/numpy-cpp/CMakeLists.txt")
         add_subdirectory("/home/sergio/Project/numpy-cpp" "${CMAKE_BINARY_DIR}/_deps/numpy-cpp")
         message(STATUS "Using local numpy-cpp at /home/sergio/Project/numpy-cpp")
+    # Propagate threading if desired
+    # set(NP_USE_THREADING ON CACHE BOOL "" FORCE) # uncomment for threading
     else()
         include(FetchContent)
         FetchContent_Declare(numpy-cpp
