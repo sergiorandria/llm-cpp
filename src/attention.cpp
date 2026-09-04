@@ -11,7 +11,7 @@ MultiHeadAttention::MultiHeadAttention(size_t n_embd, size_t n_heads, size_t blo
     Wq_.randn(0, 0.02f); Wk_.randn(0, 0.02f); Wv_.randn(0, 0.02f); Wo_.randn(0, 0.02f);
 }
 
-Tensor MultiHeadAttention::forward(const Tensor& x) const {
+Tensor MultiHeadAttention::forward(const Tensor& x, bool causal, float dropout_p) const {
     // x: [T, C]
     size_t T = x.shape[0];
     // Naive: Q = x @ Wq, etc.
@@ -27,11 +27,14 @@ Tensor MultiHeadAttention::forward(const Tensor& x) const {
     for (auto& v : scores.data) v *= scale;
 
     // Causal mask
-    for (size_t i = 0; i < T; ++i) {
-        for (size_t j = i + 1; j < T; ++j) {
-            scores(i, j) = -1e9f;
+    if(causal){
+        for (size_t i = 0; i < T; ++i) {
+            for (size_t j = i + 1; j < T; ++j) {
+                scores(i, j) = -1e9f;
+            }
         }
     }
+    (void)dropout_p; // TODO: apply dropout on attn
 
     Tensor attn = scores.softmax(1); // [T, T]
     Tensor out = attn.matmul(V);     // [T, C]
