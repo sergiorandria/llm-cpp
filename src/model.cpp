@@ -124,9 +124,14 @@ void GPT::load(const std::string& path) {
 }
 
 size_t GPT::num_parameters() const {
-    size_t n = wte_.numel() + wpe_.numel() + ln_f_gamma_.numel() + lm_head_.numel();
-    // rough: each block ~ 12 * n_embd^2
-    n += blocks_.size() * 12 * config_.n_embd * config_.n_embd;
+    size_t n = wte_.numel() + wpe_.numel() + ln_f_gamma_.numel() + ln_f_beta_.numel() + lm_head_.numel();
+    for(auto &b: blocks_){
+        // attn: 4* C*C + 4*C biases, ffn: 2* C*4C + 4C + C etc.
+        n += 4 * config_.n_embd * config_.n_embd; // Wq,Wk,Wv,Wo
+        n += 4 * config_.n_embd; // biases q,k,v,o (if bias)
+        n += config_.n_embd * 4*config_.n_embd + 4*config_.n_embd*config_.n_embd; // ffn W1,W2
+        n += 5*config_.n_embd; // layernorm gammas/betas
+    }
     return n;
 }
 
