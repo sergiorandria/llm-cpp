@@ -2,13 +2,16 @@
 
 namespace llm {
 
-FeedForward::FeedForward(size_t n_embd, size_t hidden_dim, bool bias)
+FeedForward::FeedForward(size_t n_embd, size_t hidden_dim, bool bias, Activation act)
     : W1_({n_embd, hidden_dim ? hidden_dim : 4 * n_embd}),
       W2_({hidden_dim ? hidden_dim : 4 * n_embd, n_embd}),
+      W3_({n_embd, hidden_dim ? hidden_dim : 4 * n_embd}),
       b1_({hidden_dim ? hidden_dim : 4 * n_embd}),
       b2_({n_embd}) {
     (void)bias;
+    act_=act;
     W1_.randn(0, 0.02f); W2_.randn(0, 0.02f);
+    if(act_==Activation::SILU) W3_.randn(0,0.02f);
 }
 
 Tensor FeedForward::forward(const Tensor& x) const {
