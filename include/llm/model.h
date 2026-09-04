@@ -2,6 +2,7 @@
 #include "transformer.h"
 #include "tokenizer.h"
 #include <vector>
+#include <functional>
 #include <string>
 
 namespace llm {
@@ -29,6 +30,10 @@ public:
 
     // Generate
     std::vector<int> generate(const std::vector<int>& prompt, size_t max_new_tokens,
+                              float temperature = 1.0f, int top_k = 0, float top_p = 1.0f, float rep_penalty=1.0f) const;
+    std::vector<int> generate_streaming(const std::vector<int>& prompt, size_t max_new_tokens, std::function<void(int)> cb) const;
+    // legacy overload
+    std::vector<int> generate_legacy(const std::vector<int>& prompt, size_t max_new_tokens,
                               float temperature = 1.0f, int top_k = 0) const;
 
     void save(const std::string& path) const;
