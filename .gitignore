@@ -38,3 +38,5 @@ checkpoints/
 Thumbs.db
 
 # checkpoints already ignored
+
+docs/_build/
