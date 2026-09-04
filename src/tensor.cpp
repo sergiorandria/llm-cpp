@@ -41,9 +41,13 @@ const float& Tensor::operator()(size_t i, size_t j) const {
 }
 
 Tensor Tensor::matmul(const Tensor& other) const {
+    // OpenMP parallelized when available
     assert(shape.size() == 2 && other.shape.size() == 2);
     assert(shape[1] == other.shape[0]);
     Tensor out({shape[0], other.shape[1]}, 0.0f);
+    #ifdef _OPENMP
+    #pragma omp parallel for
+    #endif
     for (size_t i = 0; i < shape[0]; ++i) {
         for (size_t k = 0; k < shape[1]; ++k) {
             float a = (*this)(i, k);
@@ -68,7 +72,10 @@ Tensor Tensor::softmax(int dim) const {
     Tensor out = *this;
     if (shape.size() == 2) {
         // softmax over last dim (j)
-        for (size_t i = 0; i < shape[0]; ++i) {
+        #ifdef _OPENMP
+    #pragma omp parallel for
+    #endif
+    for (size_t i = 0; i < shape[0]; ++i) {
             float maxv = (*this)(i, 0);
             for (size_t j = 1; j < shape[1]; ++j) maxv = std::max(maxv, (*this)(i, j));
             float sum = 0;
@@ -85,6 +92,9 @@ Tensor Tensor::softmax(int dim) const {
 Tensor Tensor::layernorm(const Tensor* gamma, const Tensor* beta, float eps) const {
     assert(shape.size() == 2);
     Tensor out(shape, 0.0f);
+    #ifdef _OPENMP
+    #pragma omp parallel for
+    #endif
     for (size_t i = 0; i < shape[0]; ++i) {
         float mean = 0;
         for (size_t j = 0; j < shape[1]; ++j) mean += (*this)(i, j);
