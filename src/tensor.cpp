@@ -82,7 +82,7 @@ Tensor Tensor::softmax(int dim) const {
     return out;
 }
 
-Tensor Tensor::layernorm(float eps) const {
+Tensor Tensor::layernorm(const Tensor* gamma, const Tensor* beta, float eps) const {
     assert(shape.size() == 2);
     Tensor out(shape, 0.0f);
     for (size_t i = 0; i < shape[0]; ++i) {
@@ -96,7 +96,10 @@ Tensor Tensor::layernorm(float eps) const {
         }
         var /= shape[1];
         for (size_t j = 0; j < shape[1]; ++j) {
-            out(i, j) = ((*this)(i, j) - mean) / std::sqrt(var + eps);
+            float v = ((*this)(i, j) - mean) / std::sqrt(var + eps);
+            if(gamma) v *= gamma->data[j % gamma->data.size()];
+            if(beta) v += beta->data[j % beta->data.size()];
+            out(i, j) = v;
         }
     }
     return out;

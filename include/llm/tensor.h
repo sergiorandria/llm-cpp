@@ -32,7 +32,7 @@ public:
     Tensor matmul(const Tensor& other) const;
     Tensor transpose() const;
     Tensor softmax(int dim = -1) const;
-    Tensor layernorm(float eps = 1e-5f) const;
+    Tensor layernorm(const Tensor* gamma=nullptr, const Tensor* beta=nullptr, float eps=1e-5f) const;
     Tensor add(const Tensor& other) const;
     Tensor sub(const Tensor& other) const;
     Tensor mul(const Tensor& other) const; // elementwise
