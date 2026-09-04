@@ -1,5 +1,7 @@
 #include "llm/model.h"
 #include "llm/tokenizer.h"
+#include "llm/config.h"
+#include "llm/cli.h"
 #include <iostream>
 #include <string>
 
@@ -37,9 +39,17 @@ int main(int argc, char* argv[]) {
     if (cmd == "--help" || cmd == "-h") {
         print_usage(argv[0]);
         return 0;
-    } else if (cmd == "train") {
-        std::cout << "[train] not yet implemented — see README. Config: src/model.cpp\n";
-        return 0;
+} else if (cmd == "train") {
+    auto args = llm::parse_args(argc, argv);
+    std::string cfg_path = args.get("config", "config/config.json.example");
+    std::string data_path = args.get("data", "data/input.txt");
+    llm::Config cfg = llm::load_config(cfg_path);
+    if(!llm::validate_config(cfg)) { std::cerr<<"[train] invalid config\n"; return 1; }
+    std::cout << "[train] config "<<cfg_path<<" data "<<data_path<<" n_layers="<<cfg.n_layers<<"\n";
+    llm::GPT model(cfg);
+    std::cout<<"[train] model params "<<model.num_parameters()<<"\n";
+    // TODO: Trainer here
+    return 0;
     } else if (cmd == "generate") {
         llm::Config cfg;
         cfg.vocab_size = 256;
