@@ -16,7 +16,7 @@ Implementation of a Large Language Model (LLM) from scratch in C++.
 - [x] Training loop (AdamW, cross-entropy, gradient clipping)
 - [x] Inference with KV-cache & sampling (temperature, top-k, top-p)
 - [x] Checkpoint save & load (binary v1)
-- [ ] Minimal dataset loader (TinyStories / Shakespeare)
+- [x] Minimal dataset loader (TinyStories / Shakespeare) — via Dataset/DataLoader + numpy
 
 ## Quick Start
 
