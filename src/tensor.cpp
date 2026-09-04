@@ -10,7 +10,7 @@ Tensor::Tensor(std::vector<size_t> shape_, float fill) : shape(std::move(shape_)
 }
 
 size_t Tensor::numel() const {
-    if (shape.empty()) return 0;
+    if (shape.empty()) return 1; // scalar
     size_t n = 1;
     for (auto s : shape) n *= s;
     return n;
