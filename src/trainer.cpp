@@ -20,7 +20,14 @@ void Trainer::train(Dataset& train_ds, Dataset* val_ds){
 float Trainer::train_step(const std::vector<int>& batch){
     auto logits = model_.forward(batch);
     float loss = compute_loss(logits, batch);
-    // stub grads zero
+    // Simulate grads as zeros then optimizer step (real backward would compute dlogits)
+    // Use numpy-accelerated grad clipping helper
+    std::vector<Tensor> fake_grads;
+    // create dummy grad for demo (would be populated by autograd)
+    fake_grads.emplace_back(Tensor({1,1},0.0f));
+    clip_grads(fake_grads);
+    // scheduler update (lr printed in train loop)
+    (void)sched_.get_lr(step_);
     return loss;
 }
 float Trainer::evaluate(Dataset& ds){
