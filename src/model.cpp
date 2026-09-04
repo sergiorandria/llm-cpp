@@ -33,9 +33,18 @@ if(config_.pos_encoding == PosEncoding::Sinusoidal){
 }
 
 static Tensor rope(const Tensor& x, size_t seq_len){
-    // Stub RoPE: return x unchanged (real impl rotates pairs)
-    (void)seq_len;
-    return x;
+    Tensor out = x;
+    // RoPE: rotate pairs (d/2) by angle = pos / 10000^(2i/d)
+    for(size_t pos=0; pos<seq_len && pos < x.shape[0]; ++pos){
+        for(size_t i=0; i+1 < x.shape[1]; i+=2){
+            float angle = pos / std::pow(10000.0f, (float)i / x.shape[1]);
+            float cos_a = std::cos(angle), sin_a = std::sin(angle);
+            float x0 = x(pos,i), x1 = x(pos,i+1);
+            out(pos,i) = x0 * cos_a - x1 * sin_a;
+            out(pos,i+1) = x0 * sin_a + x1 * cos_a;
+        }
+    }
+    return out;
 }
 Tensor GPT::forward(const std::vector<int>& tokens) const {
     size_t T = tokens.size();
