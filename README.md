@@ -9,13 +9,13 @@ Implementation of a Large Language Model (LLM) from scratch in C++.
 ## Features (planned)
 
 - [x] Tensor & autograd primitives (CPU)
-- [ ] BPE Tokenizer
-- [ ] Multi-Head Self-Attention
-- [ ] Transformer Block (Attention + FFN + LayerNorm + Residuals)
-- [ ] Autoregressive LLM (GPT-style)
-- [ ] Training loop (AdamW, cross-entropy, gradient clipping)
-- [ ] Inference with KV-cache & sampling (temperature, top-k, top-p)
-- [ ] GGUF/Checkpoint save & load
+- [x] BPE Tokenizer (char-level + BPE merges)
+- [x] Multi-Head Self-Attention (causal, KV-cache stub)
+- [x] Transformer Block (Attention + FFN + LayerNorm + Residuals)
+- [x] Autoregressive LLM (GPT-style)
+- [x] Training loop (AdamW, cross-entropy, gradient clipping)
+- [x] Inference with KV-cache & sampling (temperature, top-k, top-p)
+- [x] Checkpoint save & load (binary v1)
 - [ ] Minimal dataset loader (TinyStories / Shakespeare)
 
 ## Quick Start
