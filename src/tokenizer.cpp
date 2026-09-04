@@ -1,5 +1,7 @@
 #include "llm/tokenizer.h"
 #include <fstream>
+#include <unordered_map>
+#include <algorithm>
 
 namespace llm {
 
@@ -67,11 +69,33 @@ void Tokenizer::load(const std::string& path) {
 }
 
 void Tokenizer::train(const std::string& text, size_t num_merges){
-    // Very naive BPE train: count adjacent pairs and merge most frequent
-    (void)text; (void)num_merges;
-    // placeholder: add dummy merges for demo
-    for(size_t i=0;i<num_merges && vocab_.size()<vocab_size_; ++i){
-        merges_.emplace_back("a","b");
+    // Real BPE: iteratively merge most frequent adjacent pair
+    std::vector<std::string> words;
+    for (char c: text) words.emplace_back(1,c);
+    // naive but correct for small text
+    for(size_t iter=0; iter<num_merges && vocab_.size()<vocab_size_; ++iter){
+        std::unordered_map<std::string,int> freq;
+        for(size_t i=0;i+1<words.size();++i){
+            std::string pair = words[i] + "\x00" + words[i+1];
+            freq[pair]++;
+        }
+        if(freq.empty()) break;
+        auto best = std::max_element(freq.begin(), freq.end(),
+            [](auto &a, auto &b){return a.second < b.second;});
+        size_t sep = best->first.find("\x00");
+        std::string a = best->first.substr(0, sep);
+        std::string b = best->first.substr(sep+1);
+        std::string merged = a + b;
+        merges_.emplace_back(a,b);
+        if(vocab_.find(merged)==vocab_.end()){
+            int id=(int)vocab_.size();
+            vocab_[merged]=id; inv_vocab_[id]=merged;
+        }
+        // apply merge to words
+        for(size_t i=0;i+1<words.size();){
+            if(words[i]==a && words[i+1]==b){ words[i]=merged; words.erase(words.begin()+i+1); }
+            else ++i;
+        }
     }
 }
 void Tokenizer::save(const std::string& path) const {
