@@ -80,14 +80,17 @@ std::vector<int> GPT::generate(const std::vector<int>& prompt, size_t max_new_to
         std::vector<float> last_logits(config_.vocab_size);
         for (size_t j = 0; j < config_.vocab_size; ++j) last_logits[j] = logits(T-1, j);
 
-        // temperature
-        if (temperature != 1.0f) {
-            for (auto& v : last_logits) v /= temperature;
-        }
+// repetition penalty
+if(rep_penalty != 1.0f) last_logits = apply_repetition_penalty(last_logits, out, rep_penalty);
+// temperature
+if (temperature != 1.0f) {
+    for (auto& v : last_logits) v /= temperature;
+}
 
-        // top-k (simple)
-        int next_id = 0;
-        if (top_k > 0) {
+// top-p handling after temperature
+if(top_p < 1.0f && top_k==0){
+    next_id = sample_top_p(last_logits, top_p, 1.0f);
+} else if (top_k > 0) {
             // naive: find top_k indices, sample within them
             // for skeleton, just greedy within top-k after sorting
             std::vector<int> idx(config_.vocab_size);
