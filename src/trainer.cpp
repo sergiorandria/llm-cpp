@@ -71,9 +71,10 @@ float Trainer::train_step(const std::vector<int>& batch){
         grads.push_back(std::move(g));
     }
     clip_grads(grads);
+    float lr = sched_.get_lr(step_);
+    optim_.set_lr(lr);
     optim_.step(params, grads);
     model_.tie_weights();
-    (void)sched_.get_lr(step_);
     return loss;
 }
 float Trainer::evaluate(Dataset& ds){

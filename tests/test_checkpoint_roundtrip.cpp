@@ -20,10 +20,17 @@ int main() {
     assert(l1.shape==l2.shape);
     float diff=0; for(size_t i=0;i<l1.data.size();++i) diff += std::abs(l1.data[i]-l2.data[i]);
     std::cout << "checkpoint roundtrip diff " << diff << "\n";
-    // Current v2 only serializes top-level tensors, not blocks — so diff may be non-zero for blocks
-    // At least header and top-level should match, so we check wte via param count
+    // v3 now serializes all tensors incl. TransformerBlocks, so diff must be ~0
+    assert(diff < 1e-5 && "v3 checkpoint should be bit-exact (all blocks serialized)");
     assert(m1.num_parameters() == m2.num_parameters());
-    std::cout << "checkpoint roundtrip test passed (header ok, top-level serialized)\n";
+    // Also verify every parameter tensor is bit-exact
+    auto p1 = m1.parameters(); auto p2 = m2.parameters();
+    assert(p1.size()==p2.size());
+    for(size_t i=0;i<p1.size();++i){
+        assert(p1[i]->shape==p2[i]->shape);
+        for(size_t j=0;j<p1[i]->data.size();++j) assert(std::abs(p1[i]->data[j]-p2[i]->data[j]) < 1e-6);
+    }
+    std::cout << "checkpoint roundtrip test passed (v3 all tensors bit-exact)\n";
     std::remove(path.c_str());
     return 0;
 }
