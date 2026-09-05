@@ -7,14 +7,15 @@
 #include "llm/trainer.h"
 #include "llm/optimizer.h"
 #include "llm/scheduler.h"
+#include "llm/quantize.h"
 #include <iostream>
 #include <string>
 
 void print_usage(const char* prog) {
     std::cout << "llm-cpp v" << LLM_CPP_VERSION << "\n";
     std::cout << "Usage: " << prog << " [train|generate] [options]\n"
-              << "  train    --config <path> --data <path> [--checkpoint <path>]\n"
-              << "  generate --prompt <text> [--max_tokens 100] [--config <path>] [--checkpoint <path>] [--temperature 1.0] [--top_k 0] [--top_p 1.0]\n"
+              << "  train    --config <path> --data <path> [--checkpoint <path>] [--quantize]\n"
+              << "  generate --prompt <text> [--max_tokens 100] [--config <path>] [--checkpoint <path>] [--temperature 1.0] [--top_k 0] [--top_p 1.0] [--quantize]\n"
               << "  --help   Show this help\n";
 }
 
@@ -58,12 +59,17 @@ int main(int argc, char* argv[]) {
     std::cout<<"[train] dataset tokens "<<ds.size()<<"\n";
     llm::AdamW optim(6e-4f);
     llm::CosineScheduler sched(6e-4f, 100, 5000);
+    bool do_quant = args.has("quantize");
     llm::TrainConfig tcfg; tcfg.max_iters = 10; // demo: 10 steps so CLI doesn't hang
     llm::Trainer trainer(model, tcfg, optim, sched);
     trainer.train(ds);
+    if (do_quant) {
+        std::cout<<"[train] quantizing to int8...\n";
+        quantize_model(model);
+    }
     std::string ckpt = args.get("checkpoint", "checkpoints/model.bin");
     trainer.save_checkpoint(ckpt);
-    std::cout<<"[train] done, saved "<<ckpt<<"\n";
+    std::cout<<"[train] done, saved "<<ckpt<<(do_quant?" (quantized)":"")<<"\n";
     return 0;
 } else if (cmd == "generate") {
     auto args = llm::parse_args(argc, argv);
@@ -88,6 +94,10 @@ int main(int argc, char* argv[]) {
     if(!ckpt.empty()){
         std::cout<<"[generate] loading "<<ckpt<<"\n";
         model.load(ckpt);
+    }
+    if (args.has("quantize")) {
+        std::cout<<"[generate] quantizing model to int8 for inference\n";
+        quantize_model(model);
     }
     llm::Tokenizer tok(256);
     auto ids = tok.encode(prompt);
