@@ -19,6 +19,9 @@ struct Config {
     bool bias = false;
     PosEncoding pos_encoding = PosEncoding::Learned;
     bool weight_tying = true;
+    // Per-layer dropout/weight_decay (if empty, use global dropout)
+    std::vector<float> dropout_per_layer;
+    std::vector<float> weight_decay_per_layer;
 };
 
 class GPT {
