@@ -13,8 +13,8 @@
 void print_usage(const char* prog) {
     std::cout << "llm-cpp v" << LLM_CPP_VERSION << "\n";
     std::cout << "Usage: " << prog << " [train|generate] [options]\n"
-              << "  train    --config <path> --data <path>\n"
-              << "  generate --prompt <text> [--max_tokens 100]\n"
+              << "  train    --config <path> --data <path> [--checkpoint <path>]\n"
+              << "  generate --prompt <text> [--max_tokens 100] [--config <path>] [--checkpoint <path>] [--temperature 1.0] [--top_k 0] [--top_p 1.0]\n"
               << "  --help   Show this help\n";
 }
 
@@ -74,7 +74,16 @@ int main(int argc, char* argv[]) {
     float rep = std::stof(args.get("repetition_penalty", "1.0"));
     size_t max_tokens = std::stoi(args.get("max_tokens", "50"));
     std::string ckpt = args.get("checkpoint", "");
-    llm::Config cfg; cfg.vocab_size=256; cfg.n_layers=2; cfg.n_heads=4; cfg.n_embd=64; cfg.block_size=128;
+    std::string cfg_path = args.get("config", "");
+    llm::Config cfg;
+    if (!cfg_path.empty()) {
+        cfg = llm::load_config(cfg_path);
+        if(!llm::validate_config(cfg)) { std::cerr<<"[generate] invalid config "<<cfg_path<<"\n"; return 1; }
+        std::cout<<"[generate] config "<<cfg_path<<"\n";
+    } else {
+        cfg.vocab_size=256; cfg.n_layers=2; cfg.n_heads=4; cfg.n_embd=64; cfg.block_size=128;
+    }
+    // Auto-infer vocab from checkpoint if available and no explicit config
     llm::GPT model(cfg);
     if(!ckpt.empty()){
         std::cout<<"[generate] loading "<<ckpt<<"\n";

@@ -36,3 +36,7 @@ add_executable(test_checkpoint_roundtrip test_checkpoint_roundtrip.cpp ../src/mo
 add_test(NAME checkpoint_roundtrip COMMAND test_checkpoint_roundtrip)
 add_executable(test_train_step test_train_step.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/trainer.cpp ../src/dataset.cpp ../src/optimizer.cpp ../src/scheduler.cpp ../src/loss.cpp)
 add_test(NAME train_step COMMAND test_train_step)
+add_executable(test_grad_clip test_grad_clip.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/trainer.cpp ../src/dataset.cpp ../src/optimizer.cpp ../src/scheduler.cpp ../src/loss.cpp)
+add_test(NAME grad_clip COMMAND test_grad_clip)
+add_executable(test_kv_cache test_kv_cache.cpp ../src/kv_cache.cpp ../src/tensor.cpp)
+add_test(NAME kv_cache COMMAND test_kv_cache)

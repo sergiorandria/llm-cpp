@@ -50,8 +50,10 @@ cmake -B build -DUSE_NUMPY_CPP=OFF
 ### Generate
 
 ```bash
-./build/llm-cpp generate --prompt "Hello, world"
-# --checkpoint is parsed but model still runs from random init until checkpoint I/O lands
+./build/llm-cpp generate --prompt "Hello, world" --max_tokens 20
+./build/llm-cpp generate --config config/config.json.example --checkpoint checkpoints/model.bin --prompt "Hello" --temperature 0.8 --top_k 40 --top_p 0.9
+# --checkpoint now loads binary v3 (all blocks) when config matches; mismatched config warns and uses random init
+# KV-cache is unified (KVCache) and advanced per token, but attention still recomputes full context (O(n²)) until per-layer cache
 ```
 
 ## Project Structure

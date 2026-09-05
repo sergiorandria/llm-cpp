@@ -88,8 +88,8 @@ std::vector<int> GPT::generate(const std::vector<int>& prompt, size_t max_new_to
         if (hidden.shape[0] > 0) {
             Tensor last({1, hidden.shape[1]}, 0.0f);
             for (size_t j=0;j<hidden.shape[1];++j) last(0,j) = hidden(hidden.shape[0]-1, j);
-            // For demo we update layer 0 only; real would loop layers
-            cache.update(0, last, last);
+            for (size_t l=0; l<config_.n_layers; ++l) cache.update(l, last, last);
+            cache.advance(1);
         }
         // take last token logits
         size_t T = logits.shape[0];
