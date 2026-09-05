@@ -1,4 +1,5 @@
 #include "llm/attention.h"
+#include "llm/flash_attention.h"
 #include <cmath>
 
 namespace llm {
@@ -35,20 +36,30 @@ Tensor MultiHeadAttention::forward(const Tensor& x, bool causal, float dropout_p
         Tensor Qh = slice_head(Q, h);
         Tensor Kh = slice_head(K, h);
         Tensor Vh = slice_head(V, h);
-        Tensor Kt = Kh.transpose(); // [head_dim, T]
-        Tensor scores = Qh.matmul(Kt); // [T, T]
-        for (auto& v : scores.data) v *= scale;
-        if (causal) {
-            for (size_t i = 0; i < T; ++i)
-                for (size_t j = i + 1; j < T; ++j)
-                    scores(i, j) = -1e9f;
+        Tensor out_h;
+        if (T > 128) {
+            // FlashAttention tiled path: O(n) memory, cache-friendly
+            out_h = flash_attention(Qh, Kh, Vh, scale, causal);
+            if (dropout_p > 0.0f) {
+                std::mt19937 rng(123 + h);
+                out_h = out_h.dropout(dropout_p, rng);
+            }
+        } else {
+            Tensor Kt = Kh.transpose();
+            Tensor scores = Qh.matmul(Kt);
+            for (auto& v : scores.data) v *= scale;
+            if (causal) {
+                for (size_t i = 0; i < T; ++i)
+                    for (size_t j = i + 1; j < T; ++j)
+                        scores(i, j) = -1e9f;
+            }
+            Tensor attn = scores.softmax(1);
+            if (dropout_p > 0.0f) {
+                std::mt19937 rng(123 + h);
+                attn = attn.dropout(dropout_p, rng);
+            }
+            out_h = attn.matmul(Vh);
         }
-        Tensor attn = scores.softmax(1);
-        if (dropout_p > 0.0f) {
-            std::mt19937 rng(123 + h);
-            attn = attn.dropout(dropout_p, rng);
-        }
-        Tensor out_h = attn.matmul(Vh); // [T, head_dim]
         // concat back
         size_t base = h * head_dim_;
         for (size_t i = 0; i < T; ++i)
