@@ -12,6 +12,8 @@ struct TrainConfig {
     size_t eval_interval=500;
     float grad_clip=1.0f;
     std::string checkpoint_dir="checkpoints";
+    size_t grad_accum_steps=1; // gradient accumulation: effective batch = batch_size * accum
+    bool checkpointing=false; // activation checkpointing
 };
 class Trainer {
 public:
