@@ -1,4 +1,5 @@
 #include "llm/transformer.h"
+#include "llm/fused.h"
 
 namespace llm {
 
