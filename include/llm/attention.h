@@ -13,7 +13,10 @@ public:
     size_t n_heads_;
     size_t n_embd_;
     size_t head_dim_;
-    // KV-cache for inference
+    // KV-cache for inference — currently unused in GPT::generate (O(n²) recompute).
+    // Canonical cache is llm::KVCache (kv_cache.h); this per-attention vector is deprecated
+    // and will be removed in favor of KVCache passed through forward().
+    // See docs/NUMPY_BACKEND.md and GitHub issue: generation still recomputes full context.
     mutable std::vector<Tensor> k_cache_, v_cache_;
     void clear_cache() const { k_cache_.clear(); v_cache_.clear(); }
 private:

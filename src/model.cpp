@@ -4,6 +4,7 @@
 #include <iostream>
 #include "llm/sampling.h"
 #include <fstream>
+#include <filesystem>
 
 namespace llm {
 
@@ -121,6 +122,14 @@ void GPT::save(const std::string& path) const {
     std::cout << "[save] checkpoint written to " << path << " (" << num_parameters() << " params)\n";
 }
 void GPT::save_binary(const std::string& path) const {
+    // Ensure parent directory exists
+    {
+        size_t slash = path.find_last_of("/\\");
+        if (slash != std::string::npos) {
+            std::string dir = path.substr(0, slash);
+            std::filesystem::create_directories(dir);
+        }
+    }
     std::ofstream out(path, std::ios::binary);
     if (!out) { std::cerr << "[save_binary] cannot open " << path << "\n"; return; }
     uint32_t magic = 0x4C4C4D00; out.write((char*)&magic, 4);
@@ -148,16 +157,21 @@ void GPT::load_binary(const std::string& path) {
     uint32_t magic, version; in.read((char*)&magic,4); in.read((char*)&version,4);
     if (magic != 0x4C4C4D00) { std::cerr << "[load_binary] bad magic\n"; return; }
     if (version < 1) return;
-    // config (read and ignore if mismatch — keep current config)
     size_t vs, nl, nh, ne, bs;
     in.read((char*)&vs, sizeof(size_t)); in.read((char*)&nl, sizeof(size_t));
     in.read((char*)&nh, sizeof(size_t)); in.read((char*)&ne, sizeof(size_t));
     in.read((char*)&bs, sizeof(size_t));
+    bool mismatch = (vs != config_.vocab_size || nl != config_.n_layers || nh != config_.n_heads || ne != config_.n_embd || bs != config_.block_size);
+    if (mismatch) {
+        std::cerr << "[load_binary] config mismatch (ckpt vocab=" << vs << " n_embd=" << ne << " vs current vocab=" << config_.vocab_size << " n_embd=" << config_.n_embd << ") — skipping weight load, using random init\n";
+        return;
+    }
     auto read_tensor = [&](Tensor& t){
         uint64_t ndim; in.read((char*)&ndim,8);
         std::vector<size_t> shape(ndim);
         for (uint64_t i=0;i<ndim;++i){ uint64_t v; in.read((char*)&v,8); shape[i]= (size_t)v; }
         uint64_t n; in.read((char*)&n,8);
+        // Use ctor to get correct strides, then read data
         t = Tensor(shape, 0.0f);
         in.read((char*)t.data.data(), n*sizeof(float));
     };

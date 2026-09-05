@@ -40,3 +40,6 @@ Thumbs.db
 # checkpoints already ignored
 
 docs/_build/
+*.log
+build*.log
+build_final.log

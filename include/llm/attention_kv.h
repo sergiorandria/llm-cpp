@@ -2,6 +2,8 @@
 #include "tensor.h"
 #include <vector>
 namespace llm {
+// Deprecated: use llm::KVCache (kv_cache.h) as single canonical cache.
+// This struct is kept for backward compatibility and will be removed.
 struct KVCacheAttn {
     std::vector<Tensor> k_cache, v_cache;
     size_t len=0;
