@@ -13,9 +13,9 @@ Implementation of a Large Language Model (LLM) from scratch in C++.
 - [~] Multi-Head Self-Attention (causal; single-GEMM currently, per-head split in progress)
 - [x] Transformer Block (Attention + FFN + LayerNorm + Residuals, SwiGLU)
 - [x] Autoregressive LLM (GPT-style, RoPE/sinusoidal/learned pos)
-- [~] Training loop (forward + loss + AdamW/grad-clip; autograd/backward not yet)
-- [~] Inference sampling (temperature, top-k, top-p, repetition penalty) — KV-cache stub not yet wired
-- [~] Checkpoint save & load (binary header only; weights not yet serialized)
+- [~] Training loop (forward+hidden → CE grad for lm_head + dummy others → AdamW/clip; full autograd still TODO)
+- [~] Inference sampling (temperature, top-k, top-p, repetition penalty) — KV-cache unified (still O(n²) until per-layer cache)
+- [x] Checkpoint save & load (binary v3: header + all tensors incl. TransformerBlocks)
 - [x] Minimal dataset loader (TinyStories / Shakespeare) — via Dataset/DataLoader
 
 ## Quick Start

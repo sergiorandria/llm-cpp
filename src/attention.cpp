@@ -60,4 +60,11 @@ Tensor MultiHeadAttention::forward(const Tensor& x, bool causal, float dropout_p
     return proj;
 }
 
+std::vector<Tensor*> MultiHeadAttention::parameters() {
+    return {&Wq_, &Wk_, &Wv_, &Wo_, &bq_, &bk_, &bv_, &bo_};
+}
+std::vector<const Tensor*> MultiHeadAttention::parameters() const {
+    return {&Wq_, &Wk_, &Wv_, &Wo_, &bq_, &bk_, &bv_, &bo_};
+}
+
 } // namespace llm

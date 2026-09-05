@@ -19,6 +19,8 @@ public:
     // See docs/NUMPY_BACKEND.md and GitHub issue: generation still recomputes full context.
     mutable std::vector<Tensor> k_cache_, v_cache_;
     void clear_cache() const { k_cache_.clear(); v_cache_.clear(); }
+    std::vector<Tensor*> parameters();
+    std::vector<const Tensor*> parameters() const;
 private:
     Tensor Wq_, Wk_, Wv_, Wo_;
     Tensor bq_, bk_, bv_, bo_;

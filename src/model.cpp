@@ -147,8 +147,7 @@ void GPT::save_binary(const std::string& path) const {
     std::ofstream out(path, std::ios::binary);
     if (!out) { std::cerr << "[save_binary] cannot open " << path << "\n"; return; }
     uint32_t magic = 0x4C4C4D00; out.write((char*)&magic, 4);
-    uint32_t version = 2; out.write((char*)&version, 4);
-    // config
+    uint32_t version = 3; out.write((char*)&version, 4);
     out.write((char*)&config_.vocab_size, sizeof(size_t));
     out.write((char*)&config_.n_layers, sizeof(size_t));
     out.write((char*)&config_.n_heads, sizeof(size_t));
@@ -163,7 +162,12 @@ void GPT::save_binary(const std::string& path) const {
     write_tensor(wte_); write_tensor(wpe_);
     write_tensor(ln_f_gamma_); write_tensor(ln_f_beta_);
     write_tensor(lm_head_);
-    // Note: blocks not serialized in v2 header-only top-level for brevity — full v3 would iterate blocks
+    uint64_t n_blocks = blocks_.size(); out.write((char*)&n_blocks, 8);
+    for (auto &blk : blocks_) {
+        auto ps = blk.parameters();
+        uint64_t n_p = ps.size(); out.write((char*)&n_p, 8);
+        for (auto *p : ps) write_tensor(*p);
+    }
 }
 void GPT::load_binary(const std::string& path) {
     std::ifstream in(path, std::ios::binary);
@@ -192,6 +196,40 @@ void GPT::load_binary(const std::string& path) {
     read_tensor(wte_); read_tensor(wpe_);
     read_tensor(ln_f_gamma_); read_tensor(ln_f_beta_);
     read_tensor(lm_head_);
+    if (version >= 3) {
+        uint64_t n_blocks; in.read((char*)&n_blocks, 8);
+        if (n_blocks != blocks_.size()) {
+            std::cerr << "[load_binary] block count mismatch " << n_blocks << " vs " << blocks_.size() << " — skipping block weights\n";
+            // skip reading anyway to keep stream aligned
+            for (uint64_t b=0;b<n_blocks;++b){
+                uint64_t n_p; in.read((char*)&n_p,8);
+                for(uint64_t p=0;p<n_p;++p){
+                    uint64_t ndim; in.read((char*)&ndim,8);
+                    std::vector<size_t> shape(ndim);
+                    for(uint64_t i=0;i<ndim;++i){uint64_t v; in.read((char*)&v,8); shape[i]=v;}
+                    uint64_t n; in.read((char*)&n,8);
+                    std::vector<float> tmp(n); in.read((char*)tmp.data(), n*sizeof(float));
+                }
+            }
+        } else {
+            for (auto &blk : blocks_) {
+                uint64_t n_p; in.read((char*)&n_p,8);
+                auto ps = blk.parameters();
+                if (n_p != ps.size()) {
+                    std::cerr << "[load_binary] param count mismatch\n";
+                    for(uint64_t p=0;p<n_p;++p){
+                        uint64_t ndim; in.read((char*)&ndim,8);
+                        std::vector<size_t> shape(ndim);
+                        for(uint64_t i=0;i<ndim;++i){uint64_t v; in.read((char*)&v,8); shape[i]=v;}
+                        uint64_t n; in.read((char*)&n,8);
+                        std::vector<float> tmp(n); in.read((char*)tmp.data(), n*sizeof(float));
+                    }
+                    continue;
+                }
+                for (auto *p : ps) read_tensor(*p);
+            }
+        }
+    }
     if (config_.weight_tying) tie_weights();
 }
 
@@ -219,21 +257,27 @@ size_t GPT::num_parameters() const {
 
 std::vector<Tensor*> GPT::parameters() {
     std::vector<Tensor*> p;
-    p.reserve(4 + blocks_.size()*8);
+    p.reserve(4 + blocks_.size()*14);
     p.push_back(&wte_);
     p.push_back(&wpe_);
     p.push_back(&ln_f_gamma_);
     p.push_back(&ln_f_beta_);
     if (!config_.weight_tying) p.push_back(&lm_head_);
-    // Note: TransformerBlock weights not exposed individually yet — expose via block API
-    // For now expose only top-level tensors; trainer will also handle block params via manual update
+    for (auto &blk : blocks_) {
+        auto bp = blk.parameters();
+        p.insert(p.end(), bp.begin(), bp.end());
+    }
     return p;
 }
 std::vector<const Tensor*> GPT::parameters() const {
     std::vector<const Tensor*> p;
-    p.reserve(4);
+    p.reserve(4 + blocks_.size()*14);
     p.push_back(&wte_); p.push_back(&wpe_); p.push_back(&ln_f_gamma_); p.push_back(&ln_f_beta_);
     if (!config_.weight_tying) p.push_back(&lm_head_);
+    for (auto &blk : blocks_) {
+        auto bp = blk.parameters();
+        p.insert(p.end(), bp.begin(), bp.end());
+    }
     return p;
 }
 void GPT::tie_weights() {

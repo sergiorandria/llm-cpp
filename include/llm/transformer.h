@@ -11,6 +11,9 @@ public:
     TransformerBlock(size_t n_embd, size_t n_heads, size_t block_size, TransformerConfig cfg = {});
 
     Tensor forward(const Tensor& x) const;
+    // Expose for checkpoint v3 (full serialization)
+    std::vector<Tensor*> parameters();
+    std::vector<const Tensor*> parameters() const;
 
 private:
     MultiHeadAttention attn_;

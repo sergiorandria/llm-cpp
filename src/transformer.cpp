@@ -44,18 +44,40 @@ TransformerBlock::TransformerBlock(size_t n_embd, size_t n_heads, size_t block_s
       ln2_gamma_({n_embd}, 1.0f), ln2_beta_({n_embd}, 0.0f) {}
 
 Tensor TransformerBlock::forward(const Tensor& x) const {
-    // Pre-LN transformer with gamma/beta (numpy accelerated layernorm)
     Tensor ln1 = x.layernorm(&ln1_gamma_, &ln1_beta_);
     Tensor attn_out = attn_.forward(ln1);
-    // residual
     Tensor y(x.shape, 0.0f);
     for (size_t i = 0; i < y.data.size(); ++i) y.data[i] = x.data[i] + attn_out.data[i];
-
     Tensor ln2 = y.layernorm(&ln2_gamma_, &ln2_beta_);
     Tensor ffn_out = ffn_.forward(ln2);
     Tensor out(y.shape, 0.0f);
     for (size_t i = 0; i < out.data.size(); ++i) out.data[i] = y.data[i] + ffn_out.data[i];
     return out;
+}
+
+std::vector<Tensor*> FeedForward::parameters() {
+    if (act_ == Activation::SILU) return {&W1_, &W2_, &W3_, &b1_, &b2_};
+    return {&W1_, &W2_, &b1_, &b2_};
+}
+std::vector<const Tensor*> FeedForward::parameters() const {
+    if (act_ == Activation::SILU) return {&W1_, &W2_, &W3_, &b1_, &b2_};
+    return {&W1_, &W2_, &b1_, &b2_};
+}
+std::vector<Tensor*> TransformerBlock::parameters() {
+    std::vector<Tensor*> p;
+    auto ap = attn_.parameters(); p.insert(p.end(), ap.begin(), ap.end());
+    auto fp = ffn_.parameters(); p.insert(p.end(), fp.begin(), fp.end());
+    p.push_back(&ln1_gamma_); p.push_back(&ln1_beta_);
+    p.push_back(&ln2_gamma_); p.push_back(&ln2_beta_);
+    return p;
+}
+std::vector<const Tensor*> TransformerBlock::parameters() const {
+    std::vector<const Tensor*> p;
+    auto ap = attn_.parameters(); p.insert(p.end(), ap.begin(), ap.end());
+    auto fp = ffn_.parameters(); p.insert(p.end(), fp.begin(), fp.end());
+    p.push_back(&ln1_gamma_); p.push_back(&ln1_beta_);
+    p.push_back(&ln2_gamma_); p.push_back(&ln2_beta_);
+    return p;
 }
 
 } // namespace llm
