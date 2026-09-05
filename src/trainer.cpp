@@ -18,26 +18,61 @@ void Trainer::train(Dataset& train_ds, Dataset* val_ds){
     }
 }
 float Trainer::train_step(const std::vector<int>& batch){
-    auto logits = model_.forward(batch);
+    auto [logits, hidden] = model_.forward_with_hidden(batch);
     float loss = compute_loss(logits, batch);
-    // Minimal honest training: compute dummy grads sized like params, clip, and step.
-    // Real autograd would compute dL/dW = x^T * (softmax - one_hot); this is a stub that
-    // at least moves weights so the loop is not a no-op. Marked in README as [~].
+    // Honest gradient for lm_head: dL/dlogits = softmax - one_hot, grad = hidden^T * dL/dlogits
+    // This is the only true gradient we compute; other params still get small dummy grads
     auto params = model_.parameters();
     std::vector<Tensor> grads;
     grads.reserve(params.size());
+
+    // Compute grad for lm_head if not tied (if tied, grad flows to wte via tie)
+    Tensor grad_lm_head({model_.parameters()[0]->shape[1], logits.shape[1]}, 0.0f); // [n_embd, vocab] approx
+    // Actually lm_head shape is [n_embd, vocab], hidden [T, n_embd], need hidden^T * dlogits
+    {
+        size_t T = logits.shape[0], V = logits.shape[1], C = hidden.shape[1];
+        // Softmax per row
+        Tensor probs = logits.softmax(1);
+        // dlogits = probs; dlogits[i, target] -= 1
+        for (size_t i=0;i<T && i<batch.size();++i){
+            int tgt = batch[i];
+            if (tgt>=0 && (size_t)tgt < V) probs(i, tgt) -= 1.0f;
+            // average over T (as loss is mean)
+            for (size_t j=0;j<V;++j) probs(i,j) /= float(T);
+        }
+        // grad_lm_head = hidden^T * probs  => [C, V]
+        Tensor g({C, V}, 0.0f);
+        for (size_t c=0;c<C;++c)
+            for (size_t v=0;v<V;++v){
+                float acc=0;
+                for (size_t t=0;t<T;++t) acc += hidden(t,c) * probs(t,v);
+                g(c,v) = acc;
+            }
+        grad_lm_head = g;
+    }
+
     std::mt19937 rng(42 + step_);
     std::normal_distribution<float> dist(0.0f, 1.0f);
-    for (auto *p : params) {
+    for (size_t i=0;i<params.size();++i){
+        auto *p = params[i];
         Tensor g(p->shape, 0.0f);
-        // gradient magnitude proportional to loss, with small scale so loss doesn't explode
-        float scale = loss * 1e-4f;
-        for (auto &v : g.data) v = dist(rng) * scale;
+        if (p->shape == grad_lm_head.shape) {
+            g = grad_lm_head;
+        } else if (p->shape.size()==2 && grad_lm_head.shape.size()==2 &&
+                   p->shape[0]==grad_lm_head.shape[1] && p->shape[1]==grad_lm_head.shape[0]) {
+            // tied weight: grad is transposed
+            for (size_t a=0;a<p->shape[0];++a)
+                for (size_t b=0;b<p->shape[1];++b)
+                    g(a,b) = grad_lm_head(b,a);
+        } else {
+            float scale = loss * 1e-4f;
+            for (auto &v : g.data) v = dist(rng) * scale;
+        }
         grads.push_back(std::move(g));
     }
     clip_grads(grads);
     optim_.step(params, grads);
-    model_.tie_weights(); // keep tied weights in sync after optimizer step
+    model_.tie_weights();
     (void)sched_.get_lr(step_);
     return loss;
 }

@@ -27,6 +27,8 @@ public:
 
     // Forward: tokens [seq_len] -> logits [seq_len, vocab_size]
     Tensor forward(const std::vector<int>& tokens) const;
+    // Forward with hidden state before lm_head (for honest gradient)
+    std::pair<Tensor, Tensor> forward_with_hidden(const std::vector<int>& tokens) const; // {logits, hidden_ln}
 
     // Generate
     std::vector<int> generate(const std::vector<int>& prompt, size_t max_new_tokens,

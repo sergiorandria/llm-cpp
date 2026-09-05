@@ -3,6 +3,7 @@
 #include <random>
 #include <iostream>
 #include "llm/sampling.h"
+#include "llm/kv_cache.h"
 #include <fstream>
 #include <filesystem>
 
@@ -50,10 +51,12 @@ static Tensor rope(const Tensor& x, size_t seq_len){
     return out;
 }
 Tensor GPT::forward(const std::vector<int>& tokens) const {
+    return forward_with_hidden(tokens).first;
+}
+std::pair<Tensor, Tensor> GPT::forward_with_hidden(const std::vector<int>& tokens) const {
     size_t T = tokens.size();
     assert(T <= config_.block_size);
     Tensor x({T, config_.n_embd}, 0.0f);
-    // x = wte[tokens] + wpe[pos]
     for (size_t t = 0; t < T; ++t) {
         int tok = tokens[t];
         for (size_t j = 0; j < config_.n_embd; ++j) {
@@ -64,19 +67,30 @@ Tensor GPT::forward(const std::vector<int>& tokens) const {
     for (auto& block : blocks_) {
         x = block.forward(x);
     }
-    x = x.layernorm();
+    x = x.layernorm(&ln_f_gamma_, &ln_f_beta_);
     Tensor logits = x.matmul(lm_head_); // [T, vocab]
-    return logits;
+    return {logits, x};
 }
 
 std::vector<int> GPT::generate(const std::vector<int>& prompt, size_t max_new_tokens,
                                float temperature, int top_k, float top_p, float rep_penalty) const {
     std::vector<int> out = prompt;
     std::mt19937 rng(42);
+    // Unified KV-cache (currently tracks position, attention still recomputes full context — O(n²))
+    // Future: pass KVCache* into TransformerBlock::forward to reuse K/V per layer
+    KVCache cache(config_.n_layers, config_.block_size, config_.n_embd);
+    cache.clear();
     for (size_t step = 0; step < max_new_tokens; ++step) {
         size_t start = out.size() > config_.block_size ? out.size() - config_.block_size : 0;
         std::vector<int> ctx(out.begin() + start, out.end());
-        Tensor logits = forward(ctx);
+        auto [logits, hidden] = forward_with_hidden(ctx);
+        // Update cache with last hidden (placeholder for per-layer K/V)
+        if (hidden.shape[0] > 0) {
+            Tensor last({1, hidden.shape[1]}, 0.0f);
+            for (size_t j=0;j<hidden.shape[1];++j) last(0,j) = hidden(hidden.shape[0]-1, j);
+            // For demo we update layer 0 only; real would loop layers
+            cache.update(0, last, last);
+        }
         // take last token logits
         size_t T = logits.shape[0];
         std::vector<float> last_logits(config_.vocab_size);
