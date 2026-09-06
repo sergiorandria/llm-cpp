@@ -21,6 +21,8 @@ public:
 
     void load(const std::string& path);
     void train(const std::string& text, size_t num_merges);
+    void prune_vocab(size_t keep_top_k); // keep most frequent merges
+    void set_block_size(size_t new_size) { /* for context extension via RoPE scaling */ }
     void save(const std::string& path) const;
 
     // BPE merges

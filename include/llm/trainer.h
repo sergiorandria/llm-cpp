@@ -3,6 +3,7 @@
 #include "dataset.h"
 #include "optimizer.h"
 #include "scheduler.h"
+#include "numpy_utils.h"
 #include <string>
 namespace llm {
 struct TrainConfig {
@@ -11,6 +12,9 @@ struct TrainConfig {
     size_t eval_interval=500;
     float grad_clip=1.0f;
     std::string checkpoint_dir="checkpoints";
+    size_t grad_accum_steps=1; // gradient accumulation: effective batch = batch_size * accum
+    bool checkpointing=false; // activation checkpointing
+    bool allow_untrained_params=false; // if false, never silently use random noise for grads
 };
 class Trainer {
 public:

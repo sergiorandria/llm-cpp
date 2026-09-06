@@ -3,11 +3,16 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build
-        run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+strategy:
+  matrix:
+    numpy: [ON, OFF]
+steps:
+  - uses: actions/checkout@v4
+  - name: Build (numpy=${{matrix.numpy}})
+    run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DUSE_NUMPY_CPP=${{matrix.numpy}} -DBUILD_TESTS=ON -DENABLE_SANITIZERS=${{matrix.numpy == 'ON' && 'ON' || 'OFF'}}
           cmake --build build -j
           ./build/llm-cpp --help
           ./build/llm-cpp || true
+          # Fuzz smoke
+          ./build/tests/fuzz_tokenizer 2>&1 | head -5 || true
