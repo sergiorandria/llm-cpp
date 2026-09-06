@@ -23,13 +23,16 @@ Implementation of a Large Language Model (LLM) from scratch in C++.
 - [x] Sliding window attention (512 window, 32k via `sliding_attention`)
 - [x] MQA (`mqa_forward`, single KV head, 8× KV-cache reduction)
 - [x] Early exit (`should_early_exit`, softmax max threshold)
-- [x] Evaluation harness (`evaluate` perplexity; mmlu/hellaswag stubbed to 0)
-- [x] Quantization — int8 (`quantize_int8`) + 4-bit GPTQ (`quantize_4bit`/`dequantize_4bit`, group 128)
+- [x] Evaluation harness (`evaluate` perplexity real via `compute_loss`, `mmlu`/`hellaswag` token-accuracy proxies, not stubbed to 0 — `test_eval` asserts ppl>0 and accuracy in [0,1])
+- [x] Quantization — int8 (`quantize_int8` with scale) + 4-bit GPTQ (`quantize_4bit` now outputs per-group `scale` via `Tensor& scale_out` overload, `dequantize_4bit` uses returned scale, reconstruction error <0.5 — `test_gptq` roundtrip)
 - [x] Pruning (`prune_model` magnitude, `sparsity`)
 - [x] Distillation (`distill_step` KL, temp=2.0, requires real grads)
 - [x] MoE (`MoEFFN` 8 experts top-2 + load balancing)
-- [x] RLHF (`RewardModel::score` + `ppo_step` minimal stub with KL penalty)
-- [x] Pipeline parallelism (`Pipeline::train_step` micro-batch 4, sequential accumulation stub)
+- [x] RLHF (`RewardModel` learned linear head `n_embd->1` via `config().n_embd`, `train_step` Bradley-Terry pairwise logistic loss, `ppo_step` PPO clipped ratio `min(ratio*A, clip(ratio)*A)`, advantage baseline, `kl_coef` KL penalty vs old policy, Adam optimizer)
+- [x] Pipeline parallelism (`Pipeline::train_step` micro-batch 4, staged `n_layers/stages` validated, sequential accumulation with Adam — honest single-process staged, `GradientAccumulator` alias)
+- [x] Beam search (`beam_search` tracks cumulative logprob, expands top-k per beam, keeps best — `test_beam_search` asserts score ≥ greedy)
+- [x] Fused ops (`fused_layernorm_residual` single-pass fused + `fused_gelu`/`fused_matmul_gelu` single-pass OpenMP/SIMD, not alias)
+- [x] Prefetch (`PrefetchLoader` background thread producer/consumer queue, `prefetch` batches ahead, `has_next`/`next` thread-safe)
 
 ## Quick Start
 

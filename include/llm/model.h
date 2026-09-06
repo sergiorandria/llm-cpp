@@ -56,6 +56,7 @@ public:
     std::vector<const Tensor*> parameters() const;
     // For weight tying: share storage via copy-on-tie (true alias would need shared_ptr)
     void tie_weights();
+    const Config& config() const { return config_; }
 
 private:
     Config config_;

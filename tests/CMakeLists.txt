@@ -72,3 +72,5 @@ add_executable(test_gguf_roundtrip test_gguf_roundtrip.cpp ../src/gguf.cpp ../sr
 add_test(NAME gguf_roundtrip COMMAND test_gguf_roundtrip)
 add_executable(test_speculative test_speculative.cpp ../src/speculative.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp)
 add_test(NAME speculative COMMAND test_speculative)
+add_executable(test_beam_search test_beam_search.cpp ../src/beam.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp)
+add_test(NAME beam_search COMMAND test_beam_search)
