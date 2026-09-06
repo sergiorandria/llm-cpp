@@ -70,3 +70,5 @@ add_executable(test_pipeline test_pipeline.cpp ../src/pipeline.cpp ../src/model.
 add_test(NAME pipeline COMMAND test_pipeline)
 add_executable(test_gguf_roundtrip test_gguf_roundtrip.cpp ../src/gguf.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp)
 add_test(NAME gguf_roundtrip COMMAND test_gguf_roundtrip)
+add_executable(test_speculative test_speculative.cpp ../src/speculative.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp)
+add_test(NAME speculative COMMAND test_speculative)

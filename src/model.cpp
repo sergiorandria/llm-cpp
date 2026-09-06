@@ -181,6 +181,18 @@ std::vector<int> GPT::generate(const std::vector<int>& prompt, size_t max_new_to
         // repetition penalty
         if (rep_penalty != 1.0f)
             last_logits = apply_repetition_penalty(last_logits, out, rep_penalty);
+        // temperature 0 means greedy argmax (deterministic)
+        if (temperature == 0.0f) {
+            int best = 0;
+            float bestv = last_logits[0];
+            for (size_t i = 1; i < last_logits.size(); ++i)
+                if (last_logits[i] > bestv) {
+                    bestv = last_logits[i];
+                    best = (int)i;
+                }
+            out.push_back(best);
+            continue;
+        }
         // temperature
         if (temperature != 1.0f) {
             for (auto& v : last_logits) v /= temperature;

@@ -17,6 +17,7 @@ Implementation of a Large Language Model (LLM) from scratch in C++.
 - [~] Inference sampling (temperature, top-k, top-p, repetition penalty) — KV-cache unified (still O(n²) until per-layer cache)
 - [x] Checkpoint save & load (binary v3: header + all tensors incl. TransformerBlocks)
 - [x] GGUF save & load (`save_gguf`/`load_gguf` — GGUF v3 32-byte aligned: magic `"GGUF"` + KV metadata + tensor info + data, roundtrip bit-exact via `test_gguf_roundtrip`)
+- [x] Speculative decoding (`SpeculativeDecoder` k=4 — draft proposes k tokens, target verifies in parallel via single forward pass over draft sequence, accepts longest matching prefix, bonus token; greedy equivalence via `test_speculative`)
 - [x] Minimal dataset loader (TinyStories / Shakespeare) — via Dataset/DataLoader
 - [x] ALiBi bias (`alibi_bias`) — linear length extrapolation
 - [x] Sliding window attention (512 window, 32k via `sliding_attention`)
