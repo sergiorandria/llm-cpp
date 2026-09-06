@@ -61,6 +61,7 @@ int main(int argc, char* argv[]) {
     llm::CosineScheduler sched(6e-4f, 100, 5000);
     bool do_quant = args.has("quantize");
     llm::TrainConfig tcfg; tcfg.max_iters = 10; // demo: 10 steps so CLI doesn't hang
+    if (args.has("allow-untrained-params")) tcfg.allow_untrained_params = true;
     llm::Trainer trainer(model, tcfg, optim, sched);
     trainer.train(ds);
     if (do_quant) {

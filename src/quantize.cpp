@@ -13,4 +13,24 @@ Tensor dequantize_int8(const Tensor& q, float scale){
     for(size_t i=0;i<q.data.size();++i) out.data[i]=q.data[i]*scale;
     return out;
 }
+QuantizedTensor quantize_with_scale(const Tensor& x){
+    float maxv=0; for(float v: x.data) maxv=std::max(maxv, std::abs(v));
+    float scale = maxv / 127.0f + 1e-8f;
+    Tensor q(x.shape,0);
+    for(size_t i=0;i<x.data.size();++i) q.data[i]= std::round(x.data[i]/scale);
+    return {q, scale};
+}
+Tensor dequantize(const QuantizedTensor& qt){ return dequantize_int8(qt.q, qt.scale); }
+void quantize_model(GPT& model){
+    // Quantize all linear weights in-place via dequantize-after-quantize (simulated int8)
+    for(auto *p: model.parameters()){
+        auto qt = quantize_with_scale(*p);
+        *p = dequantize(qt);
+    }
+}
+float quantize_error(const Tensor& orig, const QuantizedTensor& qt){
+    Tensor rec = dequantize(qt);
+    float err=0; for(size_t i=0;i<orig.data.size();++i) err+= std::abs(orig.data[i]-rec.data[i]);
+    return err / orig.data.size();
+}
 }

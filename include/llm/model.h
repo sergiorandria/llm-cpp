@@ -33,6 +33,9 @@ public:
     Tensor forward(const std::vector<int>& tokens) const;
     // Forward with hidden state before lm_head (for honest gradient)
     std::pair<Tensor, Tensor> forward_with_hidden(const std::vector<int>& tokens) const; // {logits, hidden_ln}
+    // Backward: given dlogits [T,vocab], tokens, and cached hidden, compute grads for all params
+    void backward(const Tensor& dlogits, const std::vector<int>& tokens, const Tensor& hidden);
+    void zero_grad();
 
     // Generate
     std::vector<int> generate(const std::vector<int>& prompt, size_t max_new_tokens,

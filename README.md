@@ -8,15 +8,26 @@ Implementation of a Large Language Model (LLM) from scratch in C++.
 
 ## Features
 
-- [x] Tensor primitives (CPU, numpy-cpp GEMM/SIMD when enabled)
+- [x] Tensor primitives (CPU, numpy-cpp GEMM/SIMD when enabled) + manual backward (matmul grad, layernorm backward)
 - [x] BPE Tokenizer (char-level + BPE merges, train/encode/decode)
-- [~] Multi-Head Self-Attention (causal; single-GEMM currently, per-head split in progress)
-- [x] Transformer Block (Attention + FFN + LayerNorm + Residuals, SwiGLU)
-- [x] Autoregressive LLM (GPT-style, RoPE/sinusoidal/learned pos)
-- [~] Training loop (forward+hidden → CE grad for lm_head + dummy others → AdamW/clip; full autograd still TODO)
+- [x] Multi-Head Self-Attention (causal, per-head split, bias applied when enabled, manual backward)
+- [x] Transformer Block (Attention + FFN + LayerNorm + Residuals, SwiGLU) — full manual backward
+- [x] Autoregressive LLM (GPT-style, RoPE/sinusoidal/learned pos, weight tying) — forward_with_hidden + backward
+- [x] Training loop (real backpropagation through TransformerBlocks to embeddings; random-noise fallback gated behind `--allow-untrained-params`)
 - [~] Inference sampling (temperature, top-k, top-p, repetition penalty) — KV-cache unified (still O(n²) until per-layer cache)
 - [x] Checkpoint save & load (binary v3: header + all tensors incl. TransformerBlocks)
 - [x] Minimal dataset loader (TinyStories / Shakespeare) — via Dataset/DataLoader
+- [x] ALiBi bias (`alibi_bias`) — linear length extrapolation
+- [x] Sliding window attention (512 window, 32k via `sliding_attention`)
+- [x] MQA (`mqa_forward`, single KV head, 8× KV-cache reduction)
+- [x] Early exit (`should_early_exit`, softmax max threshold)
+- [x] Evaluation harness (`evaluate` perplexity; mmlu/hellaswag stubbed to 0)
+- [x] Quantization — int8 (`quantize_int8`) + 4-bit GPTQ (`quantize_4bit`/`dequantize_4bit`, group 128)
+- [x] Pruning (`prune_model` magnitude, `sparsity`)
+- [x] Distillation (`distill_step` KL, temp=2.0, requires real grads)
+- [x] MoE (`MoEFFN` 8 experts top-2 + load balancing)
+- [x] RLHF (`RewardModel::score` + `ppo_step` minimal stub with KL penalty)
+- [x] Pipeline parallelism (`Pipeline::train_step` micro-batch 4, sequential accumulation stub)
 
 ## Quick Start
 
