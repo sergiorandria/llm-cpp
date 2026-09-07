@@ -14,7 +14,7 @@ Implementation of a Large Language Model (LLM) from scratch in C++.
 - [x] Transformer Block (Attention + FFN + LayerNorm + Residuals, SwiGLU) — full manual backward
 - [x] Autoregressive LLM (GPT-style, RoPE/sinusoidal/learned pos, weight tying) — forward_with_hidden + backward
 - [x] Training loop (real backpropagation through TransformerBlocks to embeddings; random-noise fallback gated behind `--allow-untrained-params`)
-- [~] Inference sampling (temperature, top-k, top-p, repetition penalty) — KV-cache unified (still O(n²) until per-layer cache)
+- [x] Inference sampling (temperature, top-k, top-p, repetition penalty) — **per-layer KV-cache O(n)** via `KVCache` + `forward_incremental` (`attention.h:15`, `transformer.h:13`, `model.cpp:156` incremental, `test_kv_cache` + `test_model` green)
 - [x] Checkpoint save & load (binary v3: header + all tensors incl. TransformerBlocks)
 - [x] GGUF save & load (`save_gguf`/`load_gguf` — GGUF v3 32-byte aligned: magic `"GGUF"` + KV metadata + tensor info + data, roundtrip bit-exact via `test_gguf_roundtrip`)
 - [x] Speculative decoding (`SpeculativeDecoder` k=4 — draft proposes k tokens, target verifies in parallel via single forward pass over draft sequence, accepts longest matching prefix, bonus token; greedy equivalence via `test_speculative`)
@@ -69,7 +69,7 @@ cmake -B build -DUSE_NUMPY_CPP=OFF
 ./build/llm-cpp generate --prompt "Hello, world" --max_tokens 20
 ./build/llm-cpp generate --config config/config.json.example --checkpoint checkpoints/model.bin --prompt "Hello" --temperature 0.8 --top_k 40 --top_p 0.9
 # --checkpoint now loads binary v3 (all blocks) when config matches; mismatched config warns and uses random init
-# KV-cache is unified (KVCache) and advanced per token, but attention still recomputes full context (O(n²)) until per-layer cache
+# KV-cache is per-layer (`KVCache` `kv_cache.h:5`) — O(n) generation via `forward_incremental` (was O(n²) unified recompute)
 ```
 
 ## Project Structure

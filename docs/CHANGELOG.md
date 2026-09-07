@@ -39,3 +39,6 @@
 - PLAN 2 Task 4 — Pipeline: `include/llm/pipeline.h:3` honest staged header (`GradientAccumulator` alias) and `src/pipeline.cpp:1` validates `stages` partition, micro-batch accumulation with `Adam` (replaces inline SGD), stages_ now used. `test_pipeline` still green.
 - PLAN 2 Task 5 — Eval: `include/llm/eval.h:3` and `src/eval.cpp:9` now compute real `ppl` via `compute_loss` and `mmlu`/`hellaswag` as token-accuracy proxies (not hardcoded 0); `tests/test_eval.cpp:1` updated to assert accuracy in [0,1] not `==0`.
 - README updated to reflect all 5+5 stub eliminations; `ctest --test-dir build` 30/30 green, sanitizer builds green.
+
+## 0.3.3 - 2026-09-06 — Cycle 27 per-layer KV-cache
+- Per-layer KV-cache O(n): `include/llm/attention.h:10` adds `forward_incremental` with `KVCache&`, `include/llm/transformer.h:13` `forward_incremental`, `src/attention.cpp:100` implements per-head cached attention (Q 1×Hd, K/V pos+1×Hd, scores 1×(pos+1), softmax, no recompute), `src/transformer.cpp:207` staged, `src/model.cpp:156` `generate` now prefill prompt incrementally + `O(1)` per token via `KVCache` (`kv_cache.h:5` `get_k_slice`/`update`/`advance`), replaces `O(n²)` unified recompute (`forward_with_hidden` per step). `README.md:17` updated to `[x] per-layer KV-cache O(n)`, `test_kv_cache` + `test_model` + `test_speculative`/`beam` still green, `ctest` 30/30.
