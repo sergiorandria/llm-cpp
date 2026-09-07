@@ -1,5 +1,6 @@
 #pragma once
 #include "tensor.h"
+#include "kv_cache.h"
 
 namespace llm {
 
@@ -9,6 +10,9 @@ public:
 
     // x: [seq_len, n_embd] -> out: [seq_len, n_embd]
     Tensor forward(const Tensor& x, bool causal=true, float dropout_p=0.0f) const;
+    // Incremental forward with per-layer KV-cache (for O(n) generation)
+    // x: [1, n_embd] single token hidden, pos is absolute position in sequence
+    Tensor forward_incremental(const Tensor& x, KVCache& cache, size_t layer, size_t pos) const;
     // Manual backward: given x and grad_out [T,C], returns grad_x and accumulates param grads
     Tensor backward(const Tensor& x, const Tensor& grad_out) const;
 

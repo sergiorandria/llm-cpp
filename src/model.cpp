@@ -157,74 +157,97 @@ std::vector<int> GPT::generate(const std::vector<int>& prompt, size_t max_new_to
                                float temperature, int top_k, float top_p, float rep_penalty) const {
     std::vector<int> out = prompt;
     std::mt19937 rng(42);
-    // Unified KV-cache (currently tracks position, attention still recomputes full context — O(n²))
-    // Future: pass KVCache* into TransformerBlock::forward to reuse K/V per layer
+    // Per-layer KV-cache: O(n) generation, each layer stores K/V for all previous tokens
     KVCache cache(config_.n_layers, config_.block_size, config_.n_embd);
     cache.clear();
-    for (size_t step = 0; step < max_new_tokens; ++step) {
-        size_t start = out.size() > config_.block_size ? out.size() - config_.block_size : 0;
-        std::vector<int> ctx(out.begin() + start, out.end());
-        auto [logits, hidden] = forward_with_hidden(ctx);
-        // Update cache with last hidden (placeholder for per-layer K/V)
-        if (hidden.shape[0] > 0) {
-            Tensor last({1, hidden.shape[1]}, 0.0f);
-            for (size_t j = 0; j < hidden.shape[1]; ++j)
-                last(0, j) = hidden(hidden.shape[0] - 1, j);
-            for (size_t l = 0; l < config_.n_layers; ++l) cache.update(l, last, last);
+    // Helper to run one incremental step for token at pos, returning logits for next token
+    auto incremental_step = [&](int token, size_t pos) -> std::vector<float> {
+        // Build single-token embedding
+        Tensor x({1, config_.n_embd}, 0.0f);
+        int tok_clamped = ((token % (int)config_.vocab_size) + (int)config_.vocab_size) % (int)config_.vocab_size;
+        size_t wpe_pos = pos % config_.block_size; // wrap for sliding window
+        for(size_t j=0;j<config_.n_embd;++j) x(0,j) = wte_(tok_clamped, j) + wpe_(wpe_pos, j);
+        // RoPE rotation for this pos
+        if(config_.pos_encoding == PosEncoding::RoPE){
+            for(size_t i=0;i+1<config_.n_embd;i+=2){
+                float angle = (float)pos / std::pow(10000.0f, (float)i / (float)config_.n_embd);
+                // Apply rope_scaling
+                angle /= config_.rope_scaling;
+                float cos_a = std::cos(angle), sin_a = std::sin(angle);
+                float x0 = x(0,i), x1 = x(0,i+1);
+                x(0,i) = x0 * cos_a - x1 * sin_a;
+                x(0,i+1) = x0 * sin_a + x1 * cos_a;
+            }
+        }
+        Tensor h = x;
+        for(size_t b=0;b<blocks_.size();++b){
+            h = blocks_[b].forward_incremental(h, cache, b, pos);
+        }
+        h = h.layernorm(&ln_f_gamma_, &ln_f_beta_);
+        Tensor logits = h.matmul(lm_head_); // [1, vocab]
+        std::vector<float> row(config_.vocab_size);
+        for(size_t j=0;j<config_.vocab_size;++j) row[j]=logits(0,j);
+        return row;
+    };
+    // Prefill prompt into cache and get initial last_logits
+    std::vector<float> last_logits;
+    if(!prompt.empty()){
+        for(size_t pos=0;pos<prompt.size();++pos){
+            last_logits = incremental_step(prompt[pos], pos);
             cache.advance(1);
         }
-        // take last token logits
-        size_t T = logits.shape[0];
-        std::vector<float> last_logits(config_.vocab_size);
-        for (size_t j = 0; j < config_.vocab_size; ++j) last_logits[j] = logits(T - 1, j);
-
+    } else {
+        // Empty prompt: start with zero logits (uniform)
+        last_logits.assign(config_.vocab_size, 0.0f);
+    }
+    for (size_t step = 0; step < max_new_tokens; ++step) {
+        std::vector<float> cur_logits = last_logits;
         // repetition penalty
         if (rep_penalty != 1.0f)
-            last_logits = apply_repetition_penalty(last_logits, out, rep_penalty);
-        // temperature 0 means greedy argmax (deterministic)
-        if (temperature == 0.0f) {
-            int best = 0;
-            float bestv = last_logits[0];
-            for (size_t i = 1; i < last_logits.size(); ++i)
-                if (last_logits[i] > bestv) {
-                    bestv = last_logits[i];
-                    best = (int)i;
-                }
-            out.push_back(best);
-            continue;
-        }
-        // temperature
-        if (temperature != 1.0f) {
-            for (auto& v : last_logits) v /= temperature;
-        }
+            cur_logits = apply_repetition_penalty(cur_logits, out, rep_penalty);
 
         int next_id = 0;
-        // top-p handling after temperature
-        if (top_p < 1.0f && top_k == 0) {
-            next_id = sample_top_p(last_logits, top_p, 1.0f);
-        } else if (top_k > 0) {
-            // naive: find top_k indices, sample within them
-            // for skeleton, just greedy within top-k after sorting
-            std::vector<int> idx(config_.vocab_size);
-            for (size_t i = 0; i < idx.size(); ++i) idx[i] = i;
-            std::partial_sort(idx.begin(), idx.begin() + top_k, idx.end(),
-                              [&](int a, int b) { return last_logits[a] > last_logits[b]; });
-            // sample uniformly among top_k for demo
-            std::uniform_int_distribution<int> dist(0, top_k - 1);
-            next_id = idx[dist(rng)];
+        if (temperature == 0.0f) {
+            int best = 0;
+            float bestv = cur_logits[0];
+            for (size_t i = 1; i < cur_logits.size(); ++i)
+                if (cur_logits[i] > bestv) {
+                    bestv = cur_logits[i];
+                    best = (int)i;
+                }
+            next_id = best;
         } else {
-            float maxv = last_logits[0];
-            for (size_t i = 1; i < last_logits.size(); ++i) maxv = std::max(maxv, last_logits[i]);
-            float sum = 0;
-            for (auto& v : last_logits) {
-                v = std::exp(v - maxv);
-                sum += v;
+            if (temperature != 1.0f) {
+                for (auto& v : cur_logits) v /= temperature;
             }
-            for (auto& v : last_logits) v /= sum;
-            std::discrete_distribution<int> dist(last_logits.begin(), last_logits.end());
-            next_id = dist(rng);
+            if (top_p < 1.0f && top_k == 0) {
+                next_id = sample_top_p(cur_logits, top_p, 1.0f);
+            } else if (top_k > 0) {
+                std::vector<int> idx(config_.vocab_size);
+                for (size_t i = 0; i < idx.size(); ++i) idx[i] = i;
+                std::partial_sort(idx.begin(), idx.begin() + top_k, idx.end(),
+                                  [&](int a, int b) { return cur_logits[a] > cur_logits[b]; });
+                std::uniform_int_distribution<int> dist(0, top_k - 1);
+                next_id = idx[dist(rng)];
+            } else {
+                float maxv = cur_logits[0];
+                for (size_t i = 1; i < cur_logits.size(); ++i) maxv = std::max(maxv, cur_logits[i]);
+                float sum = 0;
+                for (auto& v : cur_logits) {
+                    v = std::exp(v - maxv);
+                    sum += v;
+                }
+                for (auto& v : cur_logits) v /= sum;
+                std::discrete_distribution<int> dist(cur_logits.begin(), cur_logits.end());
+                next_id = dist(rng);
+            }
         }
         out.push_back(next_id);
+        if (step + 1 >= max_new_tokens) break;
+        size_t pos = out.size() - 1;
+        // Compute logits for next token via incremental (O(1) per step, not O(n²))
+        last_logits = incremental_step(next_id, pos);
+        cache.advance(1);
     }
     return out;
 }

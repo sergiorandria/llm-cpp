@@ -98,6 +98,80 @@ Tensor MultiHeadAttention::forward(const Tensor& x, bool causal, float dropout_p
     return proj;
 }
 
+Tensor MultiHeadAttention::forward_incremental(const Tensor& x, KVCache& cache, size_t layer, size_t pos) const {
+    assert(x.shape[0]==1 && x.shape[1]==n_embd_);
+    assert(n_embd_ % n_heads_ == 0);
+    // Compute Q,K,V for single token
+    Tensor Q = x.matmul(Wq_); // [1, C]
+    Tensor K = x.matmul(Wk_);
+    Tensor V = x.matmul(Wv_);
+    if(bias_){
+        for(size_t j=0;j<n_embd_;++j){
+            Q(0,j) += bq_.data[j];
+            K(0,j) += bk_.data[j];
+            V(0,j) += bv_.data[j];
+        }
+    }
+    // Retrieve old cached K/V (size pos)
+    Tensor old_K = cache.get_k_slice(layer);
+    Tensor old_V = cache.get_v_slice(layer);
+    // Update cache with new K/V at pos (cur_len should be pos)
+    // Ensure cache size is pos before update; if not, set it
+    if(cache.size() != pos){
+        cache.set_size(pos);
+    }
+    cache.update(layer, K, V);
+    // Build K_all and V_all: concat old + new
+    size_t K_len = pos + 1;
+    Tensor K_all({K_len, n_embd_}, 0.0f);
+    Tensor V_all({K_len, n_embd_}, 0.0f);
+    for(size_t i=0;i<pos && i<old_K.shape[0];++i){
+        for(size_t j=0;j<n_embd_;++j){
+            K_all(i,j) = old_K(i,j);
+            V_all(i,j) = old_V(i,j);
+        }
+    }
+    for(size_t j=0;j<n_embd_;++j){
+        K_all(pos,j) = K(0,j);
+        V_all(pos,j) = V(0,j);
+    }
+
+    auto slice_head_all = [&](const Tensor& t, size_t h, size_t T) -> Tensor {
+        Tensor out({T, head_dim_}, 0.0f);
+        size_t base = h * head_dim_;
+        for(size_t i=0;i<T;++i) for(size_t j=0;j<head_dim_;++j) out(i,j)=t(i, base+j);
+        return out;
+    };
+    auto slice_head_q = [&](const Tensor& t, size_t h) -> Tensor {
+        Tensor out({1, head_dim_}, 0.0f);
+        size_t base = h * head_dim_;
+        for(size_t j=0;j<head_dim_;++j) out(0,j)=t(0, base+j);
+        return out;
+    };
+
+    Tensor out({1, n_embd_}, 0.0f);
+    float scale = 1.0f / std::sqrt((float)head_dim_);
+    for(size_t h=0;h<n_heads_;++h){
+        Tensor Qh = slice_head_q(Q, h); // [1, Hd]
+        Tensor Kh = slice_head_all(K_all, h, K_len); // [K_len, Hd]
+        Tensor Vh = slice_head_all(V_all, h, K_len);
+        Tensor Kt = Kh.transpose(); // [Hd, K_len]
+        // Qh [1,Hd] * Kt [Hd,K_len] = [1,K_len]
+        Tensor scores = Qh.matmul(Kt);
+        for(auto& v: scores.data) v *= scale;
+        // Causal already satisfied as K_len == pos+1, no future tokens
+        Tensor attn = scores.softmax(1); // [1, K_len]
+        Tensor out_h = attn.matmul(Vh); // [1, Hd]
+        size_t base = h * head_dim_;
+        for(size_t j=0;j<head_dim_;++j) out(0, base+j)=out_h(0,j);
+    }
+    Tensor proj = out.matmul(Wo_); // [1, C]
+    if(bias_){
+        for(size_t j=0;j<n_embd_;++j) proj(0,j) += bo_.data[j];
+    }
+    return proj;
+}
+
 Tensor MultiHeadAttention::backward(const Tensor& x, const Tensor& grad_out) const {
     // Manual backward mirroring forward — recompute intermediates
     size_t T = x.shape[0];
