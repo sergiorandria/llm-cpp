@@ -74,3 +74,5 @@ add_executable(test_speculative test_speculative.cpp ../src/speculative.cpp ../s
 add_test(NAME speculative COMMAND test_speculative)
 add_executable(test_beam_search test_beam_search.cpp ../src/beam.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp)
 add_test(NAME beam_search COMMAND test_beam_search)
+add_executable(test_kv_cache_per_layer test_kv_cache_per_layer.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp)
+add_test(NAME kv_cache_per_layer COMMAND test_kv_cache_per_layer)

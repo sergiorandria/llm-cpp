@@ -3,6 +3,9 @@
 #include <iostream>
 #include <stdexcept>
 
+#ifdef USE_OPENBLAS
+#include <cblas.h>
+#endif
 #ifdef USE_NUMPY_CPP
 #include <np/linalg.hpp>
 #include <np/np.hpp>
@@ -98,7 +101,18 @@ const float& Tensor::operator()(size_t i, size_t j) const {
 }
 
 Tensor Tensor::matmul(const Tensor& other) const {
-#ifdef USE_NUMPY_CPP
+#ifdef USE_OPENBLAS
+    assert(shape.size() == 2 && other.shape.size() == 2);
+    assert(shape[1] == other.shape[0]);
+    Tensor out({shape[0], other.shape[1]}, 0.0f);
+    // cblas_sgemm RowMajor: C = alpha*A*B + beta*C
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                (int)shape[0], (int)other.shape[1], (int)shape[1],
+                1.0f, data.data(), (int)shape[1],
+                other.data.data(), (int)other.shape[1],
+                0.0f, out.data.data(), (int)out.shape[1]);
+    return out;
+#elif defined(USE_NUMPY_CPP)
     // Accelerated via numpy-cpp blocked GEMM (SIMD + threading)
     assert(shape.size() == 2 && other.shape.size() == 2);
     assert(shape[1] == other.shape[0]);

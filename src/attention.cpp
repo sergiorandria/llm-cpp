@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "llm/flash_attention.h"
+#include "llm/flash_config.h"
 
 namespace llm {
 
@@ -155,13 +156,16 @@ Tensor MultiHeadAttention::forward_incremental(const Tensor& x, KVCache& cache, 
         Tensor Qh = slice_head_q(Q, h); // [1, Hd]
         Tensor Kh = slice_head_all(K_all, h, K_len); // [K_len, Hd]
         Tensor Vh = slice_head_all(V_all, h, K_len);
-        Tensor Kt = Kh.transpose(); // [Hd, K_len]
-        // Qh [1,Hd] * Kt [Hd,K_len] = [1,K_len]
-        Tensor scores = Qh.matmul(Kt);
-        for(auto& v: scores.data) v *= scale;
-        // Causal already satisfied as K_len == pos+1, no future tokens
-        Tensor attn = scores.softmax(1); // [1, K_len]
-        Tensor out_h = attn.matmul(Vh); // [1, Hd]
+        Tensor out_h;
+        if(K_len > 128){
+            out_h = flash_attention_incremental(Qh, Kh, Vh, scale, FLASH_BLOCK_SIZE);
+        } else {
+            Tensor Kt = Kh.transpose(); // [Hd, K_len]
+            Tensor scores = Qh.matmul(Kt);
+            for(auto& v: scores.data) v *= scale;
+            Tensor attn = scores.softmax(1); // [1, K_len]
+            out_h = attn.matmul(Vh); // [1, Hd]
+        }
         size_t base = h * head_dim_;
         for(size_t j=0;j<head_dim_;++j) out(0, base+j)=out_h(0,j);
     }

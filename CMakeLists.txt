@@ -66,6 +66,21 @@ if(OpenMP_CXX_FOUND)
     target_link_libraries(llm-cpp PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
+# Optional: OpenBLAS/MKL
+option(USE_OPENBLAS "Use OpenBLAS cblas_sgemm for matmul" OFF)
+if(USE_OPENBLAS)
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+    find_package(OpenBLAS)
+    if(OpenBLAS_FOUND)
+        target_include_directories(llm-cpp PRIVATE ${OpenBLAS_INCLUDE_DIRS})
+        target_link_libraries(llm-cpp PRIVATE ${OpenBLAS_LIBRARIES})
+        target_compile_definitions(llm-cpp PRIVATE USE_OPENBLAS=1)
+        message(STATUS "llm-cpp: USE_OPENBLAS enabled — cblas_sgemm")
+    else()
+        message(WARNING "USE_OPENBLAS=ON but OpenBLAS not found — fallback to blocked GEMM")
+    endif()
+endif()
+
 option(BUILD_TESTS "Build tests" ON)
 option(ENABLE_SANITIZERS "Enable sanitizers" OFF)
 

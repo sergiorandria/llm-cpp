@@ -42,3 +42,10 @@
 
 ## 0.3.3 - 2026-09-06 — Cycle 27 per-layer KV-cache
 - Per-layer KV-cache O(n): `include/llm/attention.h:10` adds `forward_incremental` with `KVCache&`, `include/llm/transformer.h:13` `forward_incremental`, `src/attention.cpp:100` implements per-head cached attention (Q 1×Hd, K/V pos+1×Hd, scores 1×(pos+1), softmax, no recompute), `src/transformer.cpp:207` staged, `src/model.cpp:156` `generate` now prefill prompt incrementally + `O(1)` per token via `KVCache` (`kv_cache.h:5` `get_k_slice`/`update`/`advance`), replaces `O(n²)` unified recompute (`forward_with_hidden` per step). `README.md:17` updated to `[x] per-layer KV-cache O(n)`, `test_kv_cache` + `test_model` + `test_speculative`/`beam` still green, `ctest` 30/30.
+
+## 0.3.4 - 2026-09-06 — Cycle 28 perf (Flash tiled incremental, SoA, autotune, OpenBLAS)
+- Flash tiled incremental: `include/llm/flash_attention.h:6` `flash_attention_incremental` (Q 1×D, K/V K_len×D, block tiled max/sum), `src/flash_attention.cpp:44` tiled, `src/attention.cpp:153` dispatches `K_len>128` to `flash_attention_incremental` with `FLASH_BLOCK_SIZE` (`flash_config.h:3` autotuned 32).
+- SoA KV-cache: `include/llm/kv_cache.h:5` `KVCacheConfig{soa}` (`[n_embd, max_seq_len]` vs AoS), `src/kv_cache.cpp:1` handles both, `tests/test_kv_cache_per_layer.cpp:1` SoA/AoS equivalence.
+- Autotune: `scripts/autotune_flash.py:1` micro-bench `bench_matmul` for 32/64/128/256 → `include/llm/flash_config.h:3` + `docs/BENCHMARK_DASHBOARD.md`.
+- OpenBLAS: `cmake/FindOpenBLAS.cmake:1` real `find_path`/`find_library`, `CMakeLists.txt:35` `-DUSE_OPENBLAS=ON` → `cblas_sgemm`, `src/tensor.cpp:100` RowMajor dispatch, fallback blocked GEMM.
+- Test `tests/test_kv_cache_per_layer.cpp:1` asserts incremental ≡ full forward (O(n) vs O(n²)) and `ctest` 31/31 green.
