@@ -15,6 +15,9 @@ Implementation of a Large Language Model (LLM) from scratch in C++.
 - [x] Autoregressive LLM (GPT-style, RoPE/sinusoidal/learned pos, weight tying) — forward_with_hidden + backward
 - [x] Training loop (real backpropagation through TransformerBlocks to embeddings; random-noise fallback gated behind `--allow-untrained-params`)
 - [x] Inference sampling (temperature, top-k, top-p, repetition penalty) — **per-layer KV-cache O(n)** via `KVCache` + `forward_incremental` (`attention.h:15`, `transformer.h:13`, `model.cpp:156` incremental, `test_kv_cache` + `test_model` green)
+- [x] FlashAttention tiled incremental (`flash_attention.h:9` `flash_attention_incremental` 1×Hd over pos+1, block `FLASH_BLOCK_SIZE` autotuned via `scripts/autotune_flash.py` → `flash_config.h:3` `32`, `bench_matmul` dashboard `docs/BENCHMARK_DASHBOARD.md`)
+- [x] KV-cache SoA (`kv_cache.h:5` `KVCacheConfig{soa}` `[n_embd, max_seq_len]` vs AoS, `test_kv_cache_per_layer` SoA/AoS equivalence)
+- [x] Tensor matmul OpenBLAS (`tensor.cpp:100` `cblas_sgemm` RowMajor when `-DUSE_OPENBLAS=ON`, `cmake/FindOpenBLAS.cmake:1` stub→real, fallback blocked GEMM)
 - [x] Checkpoint save & load (binary v3: header + all tensors incl. TransformerBlocks)
 - [x] GGUF save & load (`save_gguf`/`load_gguf` — GGUF v3 32-byte aligned: magic `"GGUF"` + KV metadata + tensor info + data, roundtrip bit-exact via `test_gguf_roundtrip`)
 - [x] Speculative decoding (`SpeculativeDecoder` k=4 — draft proposes k tokens, target verifies in parallel via single forward pass over draft sequence, accepts longest matching prefix, bonus token; greedy equivalence via `test_speculative`)
@@ -50,8 +53,12 @@ Implementation of a Large Language Model (LLM) from scratch in C++.
 cmake -B build -DCMAKE_BUILD_TYPE=Release -DUSE_NUMPY_CPP=ON -DBUILD_TESTS=ON
 cmake --build build -j
 ./build/llm-cpp --help
-ctest --test-dir build  # 5/5 including numpy_backend
+ctest --test-dir build  # 31/31 including kv_cache_per_layer
 ./build/tests/test_numpy_backend  # demo: matmul, randn, transpose via np
+# Autotune Flash block
+python3 scripts/autotune_flash.py  # → include/llm/flash_config.h + docs/BENCHMARK_DASHBOARD.md
+# Optional OpenBLAS
+cmake -B build -DUSE_OPENBLAS=ON  # cblas_sgemm in tensor.cpp:100
 
 # Disable numpy-cpp (fallback naive CPU)
 cmake -B build -DUSE_NUMPY_CPP=OFF
