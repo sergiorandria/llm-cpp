@@ -1,6 +1,9 @@
 #include "llm/checkpoint.h"
 #include "llm/model.h"
+#include <algorithm>
 #include <cstdint>
+#include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -122,5 +125,27 @@ std::vector<std::pair<std::string, Tensor*>> gpt_named_params(GPT& m) {
             names.push_back("blk" + std::to_string(b) + ".p" + std::to_string(j));
     for (size_t i = 0; i < ps.size(); ++i) out.emplace_back(names[i], ps[i]);
     return out;
+}
+
+BestKeeper::BestKeeper(const std::string& dir, size_t keep_n) : dir_(dir), keep_n_(keep_n) {
+    std::filesystem::create_directories(dir_);
+}
+bool BestKeeper::consider(int step, float ppl) {
+    std::string path = dir_ + "/ckpt_step" + std::to_string(step) + "_ppl" + std::to_string(ppl) + ".bin";
+    kept_.emplace_back(ppl, path);
+    std::sort(kept_.begin(), kept_.end());
+    bool in_top = false;
+    for (auto& k : kept_) if (k.second == path) { in_top = &k - &kept_[0] < (long)keep_n_; break; }
+    while (kept_.size() > keep_n_) {
+        // evict worst (no file deletion here — caller manages files; we just forget)
+        kept_.pop_back();
+    }
+    if (ppl < best_) {
+        best_ = ppl;
+        // record best pointer (sidecar text; model file itself saved by caller to best_path())
+        std::ofstream bf(dir_ + "/best.txt");
+        bf << step << " " << ppl << "\n";
+    }
+    return in_top;
 }
 }

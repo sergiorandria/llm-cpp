@@ -88,3 +88,5 @@
 - D35 Accum: `Trainer::train_step_accum` sums K micro-grads, steps every K, `test_accum_logger` no-step-before-K.
 - D36 Reduce: `mean_reduce_grads` allreduce-mean helper, `test_accum_logger` average + identity.
 - D37 Logger: `MetricsLogger::log_step` JSONL {step,loss,ppl,lr,grad_norm,tokens_sec}, 3-line test.
+- D38 Keeper: `BestKeeper(dir, keep_n)` top-N + best.txt, `test_keeper` sequence (fixed assert-side-effect trap: Release NDEBUG elides assert args, so calls hoisted out).
+- D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.

@@ -57,13 +57,24 @@ int main(int argc, char* argv[]) {
     std::cout<<"[train] model params "<<model.num_parameters()<<"\n";
     llm::Dataset ds(data_path, cfg.block_size);
     std::cout<<"[train] dataset tokens "<<ds.size()<<"\n";
-    llm::AdamW optim(6e-4f);
-    llm::CosineScheduler sched(6e-4f, 100, 5000);
+    float lr = std::stof(args.get("lr", "6e-4"));
+    llm::AdamW optim(lr);
+    llm::CosineScheduler sched(lr, 100, 5000);
     bool do_quant = args.has("quantize");
-    llm::TrainConfig tcfg; tcfg.max_iters = 10; // demo: 10 steps so CLI doesn't hang
+    // D40: real CLI flags (was hardcoded max_iters=10)
+    llm::TrainConfig tcfg;
+    tcfg.max_iters = std::stoul(args.get("max_iters", "10"));
+    tcfg.batch_size = std::stoul(args.get("batch_size", "32"));
+    tcfg.eval_interval = std::stoul(args.get("eval_every", "500"));
+    tcfg.grad_accum_steps = std::stoul(args.get("grad_accum", "1"));
     if (args.has("allow-untrained-params")) tcfg.allow_untrained_params = true;
     llm::Trainer trainer(model, tcfg, optim, sched);
-    trainer.train(ds);
+    // D39: optional eval split during training
+    std::string eval_data = args.get("eval_data", "");
+    if (!eval_data.empty()) {
+        llm::Dataset vds(eval_data, cfg.block_size);
+        trainer.train(ds, &vds);
+    } else trainer.train(ds);
     if (do_quant) {
         std::cout<<"[train] quantizing to int8...\n";
         quantize_model(model);

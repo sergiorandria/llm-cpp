@@ -128,11 +128,11 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 - [x] **D37 JSONL metrics logger** — `src/logging.cpp` (exists, extend).
   `train.log.jsonl` per-step `{step, loss, ppl, lr, grad_norm, tokens_sec}`.
   Test: 3-step run emits 3 parseable lines.
-- [ ] **D38 Best-checkpoint keeper** — `src/trainer.cpp:TrainConfig{keep_best_n=3, eval_every=100}`.
+- [x] **D38 Best-checkpoint keeper** — `src/trainer.cpp:TrainConfig{keep_best_n=3, eval_every=100}`.
   Keep `best_ppl.bin` + rolling top-3. Test: simulated ppl sequence keeps correct files.
-- [ ] **D39 Eval-during-train** — `src/main.cpp:train` add `--eval_every --eval_data`.
+- [x] **D39 Eval-during-train** — `src/main.cpp:train` add `--eval_every --eval_data`.
   Prints `val_ppl` without breaking training RNG. Test: CLI smoke `--max_iters 2 --eval_every 1`.
-- [ ] **D40 Train CLI real flags** — `src/main.cpp:train` (today `max_iters=10` hardcoded).
+- [x] **D40 Train CLI real flags** — `src/main.cpp:train` (today `max_iters=10` hardcoded).
   Wire `--max_iters --batch_size --lr --block_size --out`. Test: `--max_iters 1` finishes <30s tiny config.
 
 ## E. Inference engine (E41–E50)
