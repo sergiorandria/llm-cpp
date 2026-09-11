@@ -5,6 +5,8 @@ elseif(USE_NUMPY_CPP AND TARGET numpy-cpp::numpy-cpp)
     link_libraries(numpy-cpp::numpy-cpp)
     add_compile_definitions(USE_NUMPY_CPP=1)
 endif()
+find_package(Threads REQUIRED)
+link_libraries(Threads::Threads)
 
 add_executable(test_tensor test_tensor.cpp ../src/tensor.cpp)
 add_executable(test_attention test_attention.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/kv_cache.cpp)
@@ -152,3 +154,5 @@ add_executable(test_quant_gate test_quant_gate.cpp ../src/quantize.cpp ../src/gp
 add_test(NAME quant_gate COMMAND test_quant_gate)
 # data-dependent tests must run from repo root
 set_tests_properties(quant_gate utf8 PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_executable(test_server test_server.cpp ../src/server.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp)
+add_test(NAME server COMMAND test_server)

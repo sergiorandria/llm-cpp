@@ -185,16 +185,16 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 
 ## G. Serving & API (G61–G70)
 
-- [ ] **G61 OpenAI-compatible server** — `src/server.cpp` (new, cpp-httplib or Beast, vendored or FetchContent).
+- [x] **G61 OpenAI-compatible server** — `src/server.cpp` (new, cpp-httplib or Beast, vendored or FetchContent).
   `POST /v1/completions {prompt, max_tokens, temperature, top_p, stream}`.
   Test: python `requests` smoke vs `generate()` output match (temp=0).
-- [ ] **G62 SSE streaming** — `src/server.cpp:GET/POST stream=true`.
+- [x] **G62 SSE streaming** — `src/server.cpp:GET/POST stream=true`.
   `data: {token}` chunks + `data: [DONE]`. Test: streamed concat == non-stream body.
 - [ ] **G63 Python bindings** — `python/llm_cpp/__init__.py` + `python/bindings.cpp` (pybind11).
   `Tokenizer.encode/decode`, `GPT.forward/generate`. Test: `pytest python/tests/test_bind.py` green.
 - [ ] **G64 Production Dockerfile** — `Dockerfile` multi-stage (build → `ubuntu:24.04` runtime, non-root user).
   Image <500MB, `./llm-cpp --help` works. CI builds + pushes on tag.
-- [ ] **G65 Compose + healthcheck** — `docker-compose.yml`, `GET /healthz → {status, version, params}`.
+- [x] **G65 Compose + healthcheck** — `docker-compose.yml`, `GET /healthz → {status, version, params}`.
   Test: `docker compose up -d && curl /healthz` in CI.
 - [ ] **G66 Generate CLI flags** — `src/main.cpp:generate --stream --stop --logprobs --seed --json`.
   `--json` emits `{text, tokens, logprobs, latency_ms}`. Test each flag smoke.
@@ -204,7 +204,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   (params, arch, ppl, quant, license). Test: golden file on tiny checkpoint.
 - [ ] **G69 Client examples** — `examples/{curl.sh, python_openai.py, node_fetch.mjs}`.
   CI runs curl example against local server.
-- [ ] **G70 Concurrency limit + shutdown** — `src/server.cpp:ServerConfig{max_concurrency=8}`.
+- [x] **G70 Concurrency limit + shutdown** — `src/server.cpp:ServerConfig{max_concurrency=8}`.
   429 on overflow; SIGTERM drains. Test: 16 parallel reqs → 8×200 + 8×429.
 
 ## H. Observability & robustness (H71–H80)

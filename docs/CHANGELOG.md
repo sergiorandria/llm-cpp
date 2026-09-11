@@ -108,4 +108,5 @@
 - F58 Calib: `data/calib/calib.txt` 1k lines + `scripts/calibrate.py` byte-freq scales (113 bytes, --check).
 - F59 Gate: `test_quant_gate` calib ppl rel 8e-6<5%, 4-bit err 0.002<0.5 + `.github/workflows/quant.yml`.
 - F60 CLI: `generate/train --quantize --bits 4|8 --group 128 --out` with mean_abs_delta verify. Track F complete (10/10).
+- G61/G62/G65/G70 Server: POSIX no-dep OpenAI-compatible `Server` (`server.h/cpp`: /healthz, /v1/completions, /v1/chat/completions, SSE stream, 429 gate, SIGPIPE-proof), `test_server` loopback green (also fixed 3rd assert-elided-syscall trap: connect() hoisted).
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.
