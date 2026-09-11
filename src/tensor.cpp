@@ -94,8 +94,22 @@ Tensor Tensor::from_ndarray(const np::ndarray<float>& arr) {
     s.reserve(arr.shape.size());
     for (auto d : arr.shape) s.push_back(static_cast<size_t>(d));
     Tensor t(s, 0.0f);
-    size_t n = std::min<size_t>(t.data.size(), arr.size());
-    std::copy(arr.data().begin(), arr.data().begin() + n, t.data.begin());
+    if (arr.is_contiguous()) {
+        // Fast path: logical order == storage order (zeros, matmul results, ...)
+        size_t n = std::min<size_t>(t.data.size(), arr.size());
+        std::copy(arr.data().begin(), arr.data().begin() + n, t.data.begin());
+        return t;
+    }
+    // Views (transpose/swapaxes/...) share storage with foreign strides — copy
+    // in LOGICAL order. (Bug fix: raw copy silently un-transposed views.)
+    if (arr.shape.size() == 2) {
+        for (size_t i = 0; i < s[0]; ++i)
+            for (size_t j = 0; j < s[1]; ++j) t(i, j) = arr(i, j);
+    } else if (arr.shape.size() == 1) {
+        for (size_t i = 0; i < s[0]; ++i) t.data[i] = arr(i);
+    } else {
+        throw std::runtime_error("from_ndarray: non-contiguous rank>2 view unsupported");
+    }
     return t;
 }
 

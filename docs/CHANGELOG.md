@@ -128,5 +128,6 @@
 - I81 Threads: `init_threading()` honors LLM_THREADS/OMP_NUM_THREADS (+ BUILD.md), `test_threads_simd`.
 - I82 SIMD: `simd_caps()` reports ISA at compile time; accelerated matmul ≡ naive 8e-8, `test_threads_simd` (this env: scalar+numpy-cpp, no OpenMP — honestly reported).
 - I83 Autotune: `autotune_flash.py` also emits `gemm_config.h` (M=N=K=64 advisory, wired into naive GEMM tiling) + per-section dashboard (E48 preserved); retuned flash 32→128 on this box (flat ~11ms landscape).
+- FIX (critical): `Tensor::from_ndarray` raw-copied shared storage, silently un-transposing numpy views — every `matmul(K.transpose())` under USE_NUMPY_CPP=ON computed wrong scores (found via I84: flash-vs-naive 0.04). Now copies logical order (`arr(i,j)` when non-contiguous), flash-vs-naive 7e-8. `test_transpose` regression. NOTE: all pre-fix attention numerics/ppl under numpy builds are suspect; OFF builds were always correct.
 - Build: `profiling.cpp` added to 45 test targets + llm-c-api (new PROFILE refs).
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.
