@@ -1,0 +1,35 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+jobs:
+  artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build (no tests, numpy on)
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DUSE_NUMPY_CPP=ON
+          cmake --build build -j4 --target llm-cpp
+      - name: J99 tarball (binary + headers + schema + README)
+        run: |
+          mkdir -p dist/llm-cpp-linux-x64
+          cp build/llm-cpp dist/llm-cpp-linux-x64/
+          cp -r include dist/llm-cpp-linux-x64/
+          cp config/schema.json dist/llm-cpp-linux-x64/
+          cp README.md docs/PRODUCTION.md dist/llm-cpp-linux-x64/ 2>/dev/null || cp README.md dist/llm-cpp-linux-x64/
+          tar -czf llm-cpp-linux-x64.tar.gz -C dist llm-cpp-linux-x64
+      - name: smoke downloaded artifact layout
+        run: |
+          tar -tzf llm-cpp-linux-x64.tar.gz
+          tar -xzf llm-cpp-linux-x64.tar.gz -C /tmp
+          /tmp/llm-cpp-linux-x64/llm-cpp --help
+          /tmp/llm-cpp-linux-x64/llm-cpp --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: llm-cpp-linux-x64
+          path: llm-cpp-linux-x64.tar.gz
+      - name: docker image
+        run: |
+          docker build -t llm-cpp:${{ github.ref_name }} .
+          docker run --rm llm-cpp:${{ github.ref_name }} --help

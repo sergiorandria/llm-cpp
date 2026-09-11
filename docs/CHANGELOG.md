@@ -143,3 +143,6 @@
 - J95 Overfit: `test_overfit` Shakespeare-200 2L/64e 100 steps loss 5.10→0.04 slope<0 (6.8s).
 - J96 GGUF-Q8: `test_gguf_roundtrip` Q8_0 section (err 0.0002<0.05, greedy identical).
 - J97 SBOM: `scripts/sbom.sh` (GPL fail) + `THIRD_PARTY.md`; finding: numpy-cpp claims BSD-3 but ships NO LICENSE file (exception recorded, upstream follow-up).
+- J98 Matrix: `ci.yml` gcc/clang x Debug/Release x numpy ON/OFF + OpenBLAS job.
+- J99 Release: `release.yml` on `v*` (tarball + smoke + docker image).
+- J100 Sign-off: `docs/PRODUCTION.md` checklist, numbers, known limits. 100/100 complete.

@@ -271,12 +271,12 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   Assert dequant err bound + greedy decode identical to fp32 on fixed prompt.
 - [x] **J97 SBOM + license scan** — `scripts/sbom.sh` (Syft or `pip-licenses` for numpy-cpp pin).
   `THIRD_PARTY.md` lists MIT/Apache deps. CI fails on GPL-incompatible addition.
-- [ ] **J98 Build matrix** — `.github/workflows/ci.yml` extend to `{gcc-11,gcc-13,clang-15} × {Debug,Release} × {ON,OFF: USE_NUMPY_CPP, USE_OPENBLAS}`.
+- [x] **J98 Build matrix** — `.github/workflows/ci.yml` extend to `{gcc-11,gcc-13,clang-15} × {Debug,Release} × {ON,OFF: USE_NUMPY_CPP, USE_OPENBLAS}`.
   All green + `ctest` 31+ new tests.
-- [ ] **J99 Release artifacts** — `.github/workflows/release.yml` on tag `v*`:
+- [x] **J99 Release artifacts** — `.github/workflows/release.yml` on tag `v*`:
   `llm-cpp-linux-x64.tar.gz` (binary + `include/` + `config/schema.json` + README).
   Test: download artifact, `--help` exits 0.
-- [ ] **J100 1.0 sign-off doc** — `docs/PRODUCTION.md` checklist (all 99 above ticked, bench numbers,
+- [x] **J100 1.0 sign-off doc** — `docs/PRODUCTION.md` checklist (all 99 above ticked, bench numbers,
   known limits: CPU-only unless I87 landed, single-node, EN + Malagasy eval).
   Maintainer signs + tags `v1.0.0`.
 
