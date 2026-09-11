@@ -121,5 +121,7 @@
 - H74 Guards: server 400 when prompt+max > block_size before alloc, `test_metrics_guards`.
 - H75 Validation: 8-case table (temp/top_p/top_k/max/404) with messages, `test_metrics_guards`.
 - H80 Audit: `ServerConfig{audit_log}` hash-only lines, stable-hash + no-raw-prompt checks.
+- H76 Sanitizers: `.github/workflows/san.yml` (Debug + ASAN/UBSAN, buffer suites first).
+- H77 GGUF fuzz: `tests/fuzz_gguf` magic/truncation/flip/shape mutations — found+fixed real DoS (`bad_alloc` on corrupt u64 length; now capped 1MB + n_dims<=8 + try/catch), rejects=22, roundtrips still green.
 - Build: `profiling.cpp` added to 45 test targets + llm-c-api (new PROFILE refs).
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.

@@ -158,6 +158,8 @@ add_executable(test_server test_server.cpp ../src/server.cpp ../src/model.cpp ..
 add_test(NAME server COMMAND test_server)
 add_executable(test_metrics_guards test_metrics_guards.cpp ../src/server.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp ../src/profiling.cpp)
 add_test(NAME metrics_guards COMMAND test_metrics_guards)
+add_executable(fuzz_gguf fuzz_gguf.cpp ../src/gguf.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp ../src/profiling.cpp)
+add_test(NAME fuzz_gguf COMMAND fuzz_gguf)
 add_executable(test_config_errors test_config_errors.cpp ../src/config.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp ../src/profiling.cpp)
 add_test(NAME config_errors COMMAND test_config_errors)
 # G63: python ctypes bindings (needs libllm-c-api.so in build root)

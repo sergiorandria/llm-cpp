@@ -220,9 +220,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   Test: oversize prompt returns error, no alloc.
 - [x] **H75 Input validation** — `src/server.cpp` + `src/sampling.cpp`.
   Clamp `temperature>=0, 0<top_p<=1, top_k>=0`; reject with message. Test table of 8 bad inputs.
-- [ ] **H76 Sanitizer CI** — `.github/workflows/san.yml` (`ENABLE_SANITIZERS=ON`, `ctest build_san`).
+- [x] **H76 Sanitizer CI** — `.github/workflows/san.yml` (`ENABLE_SANITIZERS=ON`, `ctest build_san`).
   Covers GGUF + tokenizer + speculative (already green locally per CHANGELOG 0.3.1–0.3.2).
-- [ ] **H77 GGUF fuzz harness** — `tests/fuzz_gguf.cpp` (magic/truncation/corrupt-shape mutations).
+- [x] **H77 GGUF fuzz harness** — `tests/fuzz_gguf.cpp` (magic/truncation/corrupt-shape mutations).
   ASAN-clean on 10k mutations; bad magic rejected, no crash (matches `test_gguf_roundtrip` bad-magic path).
 - [ ] **H78 Atomic checkpoint write** — `src/checkpoint.cpp:save_atomic` (write `.tmp` + `fsync` + `rename`).
   Test: kill -9 mid-write simulation leaves old checkpoint intact.

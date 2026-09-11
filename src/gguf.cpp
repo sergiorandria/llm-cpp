@@ -39,6 +39,7 @@ static bool read_u64(std::ifstream& in, uint64_t& v) {
 static bool read_string(std::ifstream& in, std::string& s) {
     uint64_t len = 0;
     if (!read_u64(in, len)) return false;
+    if (len > (1u << 20)) return false;  // H77: cap attacker-controlled alloc (DoS)
     s.resize(len);
     if (len) {
         in.read(s.data(), len);
@@ -335,6 +336,7 @@ bool save_gguf_quant(const GPT& model, const std::string& path, int qtype) {
 }
 
 bool load_gguf(GPT& model, const std::string& path) {
+    try {
     std::ifstream in(path, std::ios::binary);
     if (!in) {
         std::cerr << "[gguf] load: cannot open " << path << "\n";
@@ -400,6 +402,10 @@ bool load_gguf(GPT& model, const std::string& path) {
         uint32_t n_dims = 0;
         if (!read_u32(in, n_dims)) {
             std::cerr << "[gguf] load: n_dims read failed\n";
+            return false;
+        }
+        if (n_dims > 8) {  // H77: cap dims (model tensors are <= 2D)
+            std::cerr << "[gguf] load: n_dims too large\n";
             return false;
         }
         info.dims.resize(n_dims);
@@ -470,6 +476,10 @@ bool load_gguf(GPT& model, const std::string& path) {
     std::cout << "[gguf] load " << path << " tensors " << tensor_count << " kvs " << kv_count
               << " ok\n";
     return true;
+    } catch (const std::exception& e) {  // H77: corrupt files must reject, never throw out
+        std::cerr << "[gguf] load: corrupt file (" << e.what() << ")\n";
+        return false;
+    }
 }
 
 } // namespace llm
