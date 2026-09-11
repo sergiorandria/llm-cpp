@@ -31,7 +31,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 - [x] **A03 Cross-entropy backward + label smoothing** — `src/loss.cpp`, `include/llm/loss.h`.
   Add `cross_entropy_backward(logits, target, smoothing=0.0/0.1)` returning dlogits.
   Test: smoothing=0 matches softmax-cross-entropy analytic; smoothing=0.1 sums to 0.
-- [ ] **A04 AdamW bias-correction + decoupled decay** — `src/optimizer.cpp`.
+- [x] **A04 AdamW bias-correction + decoupled decay** — `src/optimizer.cpp`.
   Verify `m_hat/(sqrt(v_hat)+eps)` + decay only on weights (not biases/norms via name filter).
   Test `test_adamw.cpp`: 10 steps on Rosenbrock decreases loss, norms excluded.
 - [ ] **A05 Global-norm grad clipping** — `src/trainer.cpp` (+ `optimizer.h` helper `clip_grad_norm_`).

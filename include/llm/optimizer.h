@@ -26,7 +26,7 @@ public:
     void zero_grad() override {}
     void set_lr(float lr) override { lr_ = lr; }
     float get_lr() const override { return lr_; }
-private:
+protected:
     float lr_, b1_, b2_, eps_; int t_=0;
     std::vector<Tensor> m_, v_;
 };
@@ -34,6 +34,10 @@ class AdamW : public Adam {
 public:
     AdamW(float lr=1e-3f, float b1=0.9f, float b2=0.999f, float eps=1e-8f, float wd=0.01f);
     void step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads) override;
+    // Explicit per-param decay flags (true = apply wd). Size must match params or empty = auto (2D only).
+    void step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads,
+              const std::vector<char>& decay);
+    static bool default_decay(const Tensor& p) { return p.shape.size() > 1; }
 private: float wd_;
 };
 }

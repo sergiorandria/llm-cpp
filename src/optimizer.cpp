@@ -22,7 +22,20 @@ void Adam::step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads){
 }
 AdamW::AdamW(float lr, float b1, float b2, float eps, float wd): Adam(lr,b1,b2,eps), wd_(wd){}
 void AdamW::step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads){
-    for(auto p: params) for(auto &v: p->data) v -= 0.01f * wd_ * v; // naive weight decay before Adam
+    std::vector<char> auto_decay(params.size(), 0);
+    for (size_t i = 0; i < params.size(); ++i) auto_decay[i] = default_decay(*params[i]) ? 1 : 0;
+    step(params, grads, auto_decay);
+}
+void AdamW::step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads,
+                 const std::vector<char>& decay) {
+    // Decoupled weight decay (AdamW): p -= lr * wd * p for decay params only,
+    // then standard Adam with bias correction. Skips 1D bias/norm by default.
+    for (size_t i = 0; i < params.size(); ++i) {
+        bool do_decay = decay.empty() ? default_decay(*params[i]) : (i < decay.size() && decay[i]);
+        if (!do_decay) continue;
+        float lr = get_lr();
+        for (auto& v : params[i]->data) v -= lr * wd_ * v;
+    }
     Adam::step(params, grads);
 }
 }
