@@ -174,10 +174,6 @@ Tensor Tensor::softmax(int dim) const {
 }
 
 Tensor Tensor::layernorm(const Tensor* gamma, const Tensor* beta, float eps) const {
-#ifdef USE_NUMPY_CPP
-    // Use numpy-cpp statistics for mean/var (SIMD, parallel) then apply gamma/beta
-    // Fallback to manual per-row still vectorized; keeps epsilon handling identical
-#endif
     assert(shape.size() == 2);
     Tensor out(shape, 0.0f);
 #ifdef _OPENMP
@@ -377,6 +373,58 @@ Tensor::LayernormGrad Tensor::layernorm_backward(const Tensor& grad_out, const T
         }
     }
     return {grad_x, grad_gamma, grad_beta};
+}
+
+Tensor Tensor::rmsnorm(const Tensor* weight, float eps) const {
+    assert(shape.size() == 2);
+    Tensor out(shape, 0.0f);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (size_t i = 0; i < shape[0]; ++i) {
+        float ms = 0;
+        for (size_t j = 0; j < shape[1]; ++j) ms += (*this)(i, j) * (*this)(i, j);
+        ms /= (float)shape[1];
+        float inv = 1.0f / std::sqrt(ms + eps);
+        for (size_t j = 0; j < shape[1]; ++j) {
+            float v = (*this)(i, j) * inv;
+            if (weight) v *= weight->data[j % weight->data.size()];
+            out(i, j) = v;
+        }
+    }
+    return out;
+}
+
+Tensor::RmsnormGrad Tensor::rmsnorm_backward(const Tensor& grad_out, const Tensor* weight,
+                                             float eps) const {
+    assert(shape.size() == 2 && grad_out.shape == shape);
+    size_t T = shape[0], C = shape[1];
+    Tensor grad_x(shape, 0.0f);
+    Tensor grad_w({C}, 0.0f);
+    for (size_t i = 0; i < T; ++i) {
+        float ms = 0;
+        for (size_t j = 0; j < C; ++j) ms += (*this)(i, j) * (*this)(i, j);
+        ms /= (float)C;
+        float inv = 1.0f / std::sqrt(ms + eps);
+        float inv3 = inv * inv * inv / (float)C;
+        // grad_w += grad_out * x_hat (x_hat = x*inv)
+        for (size_t j = 0; j < C; ++j) {
+            float x_hat = (*this)(i, j) * inv;
+            grad_w.data[j] += grad_out(i, j) * x_hat;
+        }
+        // grad_x = inv*(dy*w) - x * (sum(dy*w*x) * inv^3 / C)
+        float dot = 0;
+        for (size_t j = 0; j < C; ++j) {
+            float w = weight ? weight->data[j % weight->data.size()] : 1.0f;
+            dot += grad_out(i, j) * w * (*this)(i, j);
+        }
+        float coef = dot * inv3;
+        for (size_t j = 0; j < C; ++j) {
+            float w = weight ? weight->data[j % weight->data.size()] : 1.0f;
+            grad_x(i, j) = grad_out(i, j) * w * inv - (*this)(i, j) * coef;
+        }
+    }
+    return {grad_x, grad_w};
 }
 
 }  // namespace llm

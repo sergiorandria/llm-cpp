@@ -22,7 +22,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 
 ## A. Correctness & Autograd hardening (A01–A10)
 
-- [ ] **A01 RMSNorm forward+backward** — `include/llm/layernorm.h`, `src/layernorm.cpp`.
+- [x] **A01 RMSNorm forward+backward** — `include/llm/layernorm.h`, `src/layernorm.cpp`.
   Add `rmsnorm(x, weight, eps)` + `rmsnorm_backward`. Test `test_rmsnorm.cpp`:
   finite-diff grad err <1e-3, equivalence to LayerNorm-with-zero-mean.
 - [ ] **A02 Central grad-check harness** — `tests/grad_check.h` (new).

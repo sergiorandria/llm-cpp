@@ -50,6 +50,7 @@ class Tensor {
     Tensor softmax(int dim = -1) const;
     Tensor layernorm(const Tensor* gamma = nullptr, const Tensor* beta = nullptr,
                      float eps = 1e-5f) const;
+    Tensor rmsnorm(const Tensor* weight = nullptr, float eps = 1e-5f) const;
     Tensor add(const Tensor& other) const;
     Tensor sub(const Tensor& other) const;
     Tensor mul(const Tensor& other) const;  // elementwise
@@ -77,6 +78,9 @@ class Tensor {
     struct LayernormGrad;
     LayernormGrad layernorm_backward(const Tensor& grad_out, const Tensor* gamma,
                                      float eps = 1e-5f) const;
+    struct RmsnormGrad;
+    RmsnormGrad rmsnorm_backward(const Tensor& grad_out, const Tensor* weight,
+                                 float eps = 1e-5f) const;
 
 #ifdef USE_NUMPY_CPP
     // ── numpy-cpp interop ───────────────────────────────────────────────
@@ -96,6 +100,11 @@ struct Tensor::LayernormGrad {
     Tensor grad_x;
     Tensor grad_gamma;
     Tensor grad_beta;
+};
+
+struct Tensor::RmsnormGrad {
+    Tensor grad_x;
+    Tensor grad_w;
 };
 
 }  // namespace llm

@@ -49,3 +49,6 @@
 - Autotune: `scripts/autotune_flash.py:1` micro-bench `bench_matmul` for 32/64/128/256 → `include/llm/flash_config.h:3` + `docs/BENCHMARK_DASHBOARD.md`.
 - OpenBLAS: `cmake/FindOpenBLAS.cmake:1` real `find_path`/`find_library`, `CMakeLists.txt:35` `-DUSE_OPENBLAS=ON` → `cblas_sgemm`, `src/tensor.cpp:100` RowMajor dispatch, fallback blocked GEMM.
 - Test `tests/test_kv_cache_per_layer.cpp:1` asserts incremental ≡ full forward (O(n) vs O(n²)) and `ctest` 31/31 green.
+
+## Unreleased — PRODUCTION_100 Track A
+- A01 RMSNorm: `Tensor::rmsnorm` + `rmsnorm_backward` (`tensor.h/cpp`), `RMSNorm` class (`layernorm.h/cpp`), `test_rmsnorm` finite-diff <2e-2, 32/32 green.
