@@ -59,3 +59,4 @@
 - A06 Determinism: `set_global_seed/global_seed` (`utils.h/cpp`), seeded sampling overloads (`sampling.h/cpp`), `test_dropout_seed` same-seed identical.
 - A07 NaN guard: `has_nonfinite(grads)` + `Trainer::skipped_steps`, skips optimizer on non-finite, `test_nan_guard`.
 - A09 Loss scale: `TrainConfig::loss_scale` scale-dlogits/unscale-grads, `test_nan_guard` 1024x ≡ 1x.
+- A08 Deterministic: `GPT::Config::deterministic` + `TrainConfig::deterministic` (seed 42, OMP 1 thread), `test_deterministic` bit-identical.

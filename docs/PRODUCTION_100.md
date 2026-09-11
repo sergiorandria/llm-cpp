@@ -43,7 +43,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 - [x] **A07 NaN/Inf detector in train_step** — `src/trainer.cpp`.
   After `backward()`, scan `grad` for non-finite; on hit skip optimizer step + log + counter.
   Test: inject NaN grad, assert step skipped and counter++.
-- [ ] **A08 Deterministic mode flag** — `include/llm/model.h:Config{deterministic=false}`,
+- [x] **A08 Deterministic mode flag** — `include/llm/model.h:Config{deterministic=false}`,
   `src/model.cpp`, `CMakeLists.txt` (`-DDETERMINISTIC` disables OpenMP nondeterminism).
   Test: two runs `TinyStories 50 steps` bit-identical when on.
 - [x] **A09 Loss-scale guard for fp16 path** — `src/trainer.cpp`.

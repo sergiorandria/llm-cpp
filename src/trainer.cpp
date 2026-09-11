@@ -4,9 +4,20 @@
 #include <iostream>
 
 #include "llm/loss.h"
+#include "llm/utils.h"
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 namespace llm {
 Trainer::Trainer(GPT& model, const TrainConfig& cfg, Optimizer& optim, LRScheduler& sched)
-    : model_(model), cfg_(cfg), optim_(optim), sched_(sched) {}
+    : model_(model), cfg_(cfg), optim_(optim), sched_(sched) {
+    if (cfg_.deterministic) {
+        set_global_seed(42);
+#ifdef _OPENMP
+        omp_set_num_threads(1);
+#endif
+    }
+}
 void Trainer::train(Dataset& train_ds, Dataset* val_ds) {
     DataLoader loader(train_ds, cfg_.batch_size);
     while (step_ < (int)cfg_.max_iters && loader.has_next()) {

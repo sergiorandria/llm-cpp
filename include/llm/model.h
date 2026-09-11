@@ -23,6 +23,7 @@ struct Config {
     std::vector<float> weight_decay_per_layer;
     float rope_theta = 10000.0f; // RoPE base, NTK scaling for 8k: 50000
     float rope_scaling = 1.0f; // 1.0 = 1k, 4.0 = 4k, 8.0 = 8k
+    bool deterministic = false; // A08: fixed seeds + single-thread when true
 };
 
 class GPT {
