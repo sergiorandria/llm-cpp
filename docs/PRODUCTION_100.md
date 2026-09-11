@@ -211,14 +211,14 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 
 - [x] **H71 Structured logging** — `src/logging.cpp:Logger{level=json}`.
   `{ts, level, msg, step, tokens_sec}` to stderr. Test: `LOG_INFO` line parses as JSON.
-- [ ] **H72 Prometheus metrics** — `src/server.cpp:GET /metrics`.
+- [x] **H72 Prometheus metrics** — `src/server.cpp:GET /metrics`.
   `tokens_total, requests_total, latency_histogram, kv_cache_bytes`. Test: scrape after 3 gens.
 - [x] **H73 Profiling timers** — `include/llm/profiling.h` (exists, wire it).
   Scoped `PROFILE("attn")` in `attention.cpp`, `transformer.cpp`, `model.cpp`.
   `bench` prints per-op ms. Test: `test_profiling` asserts all timers >0.
-- [ ] **H74 OOM / length guards** — `src/model.cpp:generate` early `prompt.size()+max_new > block_size → 400/Err`.
+- [x] **H74 OOM / length guards** — `src/model.cpp:generate` early `prompt.size()+max_new > block_size → 400/Err`.
   Test: oversize prompt returns error, no alloc.
-- [ ] **H75 Input validation** — `src/server.cpp` + `src/sampling.cpp`.
+- [x] **H75 Input validation** — `src/server.cpp` + `src/sampling.cpp`.
   Clamp `temperature>=0, 0<top_p<=1, top_k>=0`; reject with message. Test table of 8 bad inputs.
 - [ ] **H76 Sanitizer CI** — `.github/workflows/san.yml` (`ENABLE_SANITIZERS=ON`, `ctest build_san`).
   Covers GGUF + tokenizer + speculative (already green locally per CHANGELOG 0.3.1–0.3.2).
@@ -228,7 +228,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   Test: kill -9 mid-write simulation leaves old checkpoint intact.
 - [ ] **H79 NaN-rollback** — `src/trainer.cpp:keep_last_good(params)` snapshot every `eval_every`.
   On NaN loss restore + halve LR. Test: injected NaN recovers and loss finite next step.
-- [ ] **H80 Generation audit log** — `src/server.cpp:ServerConfig{audit_log=path}` appends
+- [x] **H80 Generation audit log** — `src/server.cpp:ServerConfig{audit_log=path}` appends
   `{ts, prompt_hash, tokens, params}` (never raw PII by default). Test: 2 reqs → 2 lines, hash stable.
 
 ## I. Hardware & perf (I81–I90)

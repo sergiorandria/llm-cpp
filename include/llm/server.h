@@ -11,6 +11,7 @@ struct ServerConfig {
     int port = 8080;             // 0 = ephemeral (tests)
     size_t max_concurrency = 8;  // 0 = always 429 (tests); excess -> 429
     size_t max_tokens_default = 50;
+    std::string audit_log;       // H80: "" = off; else append {ts,prompt_hash,tokens} per completion
 };
 struct HttpResponse {
     int status = 200;
@@ -35,6 +36,9 @@ public:
     // G70: concurrency gate (public for tests)
     bool try_enter();
     void leave();
+    // H72: counters (public read for tests)
+    uint64_t requests_total() const { return requests_total_.load(); }
+    uint64_t tokens_total() const { return tokens_total_.load(); }
 private:
     HttpResponse serve_completions(const std::string& body, bool stream);
     HttpResponse serve_chat(const std::string& body, bool stream);
@@ -48,5 +52,10 @@ private:
     std::atomic<int> in_flight_{0};
     int listen_fd_ = -1;
     std::thread accept_thr_;
+    // H72 metrics
+    std::atomic<uint64_t> requests_total_{0};
+    std::atomic<uint64_t> tokens_total_{0};
+    std::atomic<uint64_t> latency_ms_total_{0};
+    void audit_append(const std::string& prompt, size_t new_tokens);
 };
 } // namespace llm

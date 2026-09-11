@@ -6,6 +6,7 @@
 #include <csignal>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
 #include <netinet/in.h>
 #include <sstream>
 #include <sys/select.h>
@@ -100,7 +101,21 @@ static HttpResponse err400(const std::string& msg) {
     return {400, "application/json", "{\"error\":\"" + json_escape(msg) + "\"}"};
 }
 
+void Server::audit_append(const std::string& prompt, size_t new_tokens) {
+    if (cfg_.audit_log.empty()) return;
+    // H80: hash only — never raw prompt bytes (PII-safe default)
+    size_t h = std::hash<std::string>{}(prompt);
+    std::ostringstream o;
+    o << "{\"ts\":" << std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count()
+      << ",\"prompt_hash\":" << h << ",\"new_tokens\":" << new_tokens
+      << ",\"params\":" << model_.num_parameters() << "}\n";
+    std::ofstream f(cfg_.audit_log, std::ios::app);
+    f << o.str();
+}
+
 HttpResponse Server::serve_completions(const std::string& body, bool stream) {
+    auto t0 = std::chrono::steady_clock::now();
     std::string prompt = json_get_string(body, "prompt", "");
     double max_t = json_get_number(body, "max_tokens", (double)cfg_.max_tokens_default);
     double temp = json_get_number(body, "temperature", 1.0);
@@ -111,12 +126,21 @@ HttpResponse Server::serve_completions(const std::string& body, bool stream) {
     if (top_k < 0) return err400("top_k must be >= 0");
     if (max_t <= 0 || max_t > 4096) return err400("max_tokens must be in [1, 4096]");
     auto ids = tok_.encode(prompt);
+    // H74: refuse oversize before any big alloc
+    if (ids.size() + (size_t)max_t > model_.config().block_size)
+        return err400("prompt + max_tokens exceeds block_size");
     std::vector<int> out;
     if (temp == 0) out = model_.generate(ids, (size_t)max_t, 0.0f, 0);
     else {
         auto go = model_.generate_with_logprobs(ids, (size_t)max_t, (float)temp, (int)top_k, (float)top_p);
         out = go.tokens;
     }
+    size_t new_tokens = out.size() > ids.size() ? out.size() - ids.size() : 0;
+    requests_total_++;
+    tokens_total_ += new_tokens;
+    latency_ms_total_ += (uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - t0).count();
+    audit_append(prompt, new_tokens);
     std::vector<int> completion(out.begin() + ids.size(), out.end());
     std::string text = tok_.decode(completion);
     if (!stream) {
@@ -181,6 +205,20 @@ HttpResponse Server::dispatch(const std::string& method, const std::string& path
         std::ostringstream o;
         o << "{\"status\":\"ok\",\"version\":\"" << LLM_CPP_VERSION << "\",\"params\":" << model_.num_parameters() << "}";
         return {200, "application/json", o.str()};
+    }
+    if (method == "GET" && path == "/metrics") {
+        // H72: Prometheus exposition
+        const auto& c = model_.config();
+        std::ostringstream o;
+        o << "# HELP llm_requests_total Total completion requests\n# TYPE llm_requests_total counter\n"
+          << "llm_requests_total " << requests_total_.load() << "\n"
+          << "# HELP llm_tokens_total Total generated tokens\n# TYPE llm_tokens_total counter\n"
+          << "llm_tokens_total " << tokens_total_.load() << "\n"
+          << "# HELP llm_latency_ms_total Total generate latency ms\n# TYPE llm_latency_ms_total counter\n"
+          << "llm_latency_ms_total " << latency_ms_total_.load() << "\n"
+          << "# HELP llm_kv_cache_bytes Reserved KV-cache bytes (contiguous layout)\n# TYPE llm_kv_cache_bytes gauge\n"
+          << "llm_kv_cache_bytes " << (uint64_t)c.n_layers * c.block_size * c.n_embd * 4 * 2 << "\n";
+        return {200, "text/plain; version=0.0.4", o.str()};
     }
     if (method == "POST" && path == "/v1/completions")
         return serve_completions(body, json_get_bool(body, "stream", false));

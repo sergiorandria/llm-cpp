@@ -117,4 +117,9 @@
 - G64/G65 Deploy: multi-stage `Dockerfile` (non-root, HEALTHCHECK, serve entrypoint) + `docker-compose.yml` (volume + healthcheck, `compose config` OK; full image build deferred to tag CI — 25min+ locally).
 - H71 Logging: `format_json/log_json` ({ts,level,msg}+fields to stderr), `test_log_prof` key checks.
 - H73 Profiling: built-in `PROFILE(name)` ScopedTimer registry + `profiling_report`, wired attn/block/forward, `test_log_prof` all timers >0.
+- H72 Metrics: `GET /metrics` Prometheus (requests/tokens/latency/kv_bytes), `test_metrics_guards` (assert-verified via -UNDEBUG build).
+- H74 Guards: server 400 when prompt+max > block_size before alloc, `test_metrics_guards`.
+- H75 Validation: 8-case table (temp/top_p/top_k/max/404) with messages, `test_metrics_guards`.
+- H80 Audit: `ServerConfig{audit_log}` hash-only lines, stable-hash + no-raw-prompt checks.
+- Build: `profiling.cpp` added to 45 test targets + llm-c-api (new PROFILE refs).
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.
