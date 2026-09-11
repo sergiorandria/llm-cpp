@@ -158,3 +158,7 @@ add_executable(test_server test_server.cpp ../src/server.cpp ../src/model.cpp ..
 add_test(NAME server COMMAND test_server)
 add_executable(test_config_errors test_config_errors.cpp ../src/config.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp)
 add_test(NAME config_errors COMMAND test_config_errors)
+# G63: python ctypes bindings (needs libllm-c-api.so in build root)
+add_test(NAME pybind COMMAND ${CMAKE_COMMAND} -E env "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}"
+  python3 ${CMAKE_SOURCE_DIR}/python/tests/test_bind.py)
+set_tests_properties(pybind PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

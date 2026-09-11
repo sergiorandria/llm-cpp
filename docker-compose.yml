@@ -1,0 +1,18 @@
+# G65: local serving with model volume + healthcheck.
+services:
+  llm:
+    build: .
+    image: llm-cpp:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./checkpoints:/home/llm/checkpoints:ro
+      - ./config:/home/llm/config:ro
+    command: ["serve", "--port", "8080", "--checkpoint", "checkpoints/model.bin", "--max_concurrency", "8"]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped

@@ -95,6 +95,25 @@ message(STATUS "C++ flags: ${CMAKE_CXX_FLAGS}")
 install(TARGETS llm-cpp DESTINATION bin)
 install(DIRECTORY include/ DESTINATION include)
 
+# G63: shared C ABI library for Python ctypes (no pybind11 needed)
+add_library(llm-c-api SHARED
+  src/c_api.cpp src/model.cpp src/attention.cpp src/tensor.cpp src/transformer.cpp
+  src/tokenizer.cpp src/sampling.cpp src/kv_cache.cpp src/flash_attention.cpp
+  src/fused.cpp src/layernorm.cpp src/utils.cpp src/config.cpp)
+target_include_directories(llm-c-api PRIVATE include)
+set_target_properties(llm-c-api PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+if(USE_NUMPY_CPP AND TARGET numpy-cpp)
+  target_link_libraries(llm-c-api PRIVATE numpy-cpp)
+  target_compile_definitions(llm-c-api PRIVATE USE_NUMPY_CPP=1)
+elseif(USE_NUMPY_CPP AND TARGET numpy-cpp::numpy-cpp)
+  target_link_libraries(llm-c-api PRIVATE numpy-cpp::numpy-cpp)
+  target_compile_definitions(llm-c-api PRIVATE USE_NUMPY_CPP=1)
+endif()
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(llm-c-api PRIVATE OpenMP::OpenMP_CXX)
+endif()
+install(TARGETS llm-c-api DESTINATION lib)
+
 enable_testing()
 if(BUILD_TESTS)
   add_subdirectory(tests)

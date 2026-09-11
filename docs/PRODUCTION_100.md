@@ -190,9 +190,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   Test: python `requests` smoke vs `generate()` output match (temp=0).
 - [x] **G62 SSE streaming** — `src/server.cpp:GET/POST stream=true`.
   `data: {token}` chunks + `data: [DONE]`. Test: streamed concat == non-stream body.
-- [ ] **G63 Python bindings** — `python/llm_cpp/__init__.py` + `python/bindings.cpp` (pybind11).
+- [x] **G63 Python bindings** — `python/llm_cpp/__init__.py` + `python/bindings.cpp` (pybind11).
   `Tokenizer.encode/decode`, `GPT.forward/generate`. Test: `pytest python/tests/test_bind.py` green.
-- [ ] **G64 Production Dockerfile** — `Dockerfile` multi-stage (build → `ubuntu:24.04` runtime, non-root user).
+- [x] **G64 Production Dockerfile** — `Dockerfile` multi-stage (build → `ubuntu:24.04` runtime, non-root user).
   Image <500MB, `./llm-cpp --help` works. CI builds + pushes on tag.
 - [x] **G65 Compose + healthcheck** — `docker-compose.yml`, `GET /healthz → {status, version, params}`.
   Test: `docker compose up -d && curl /healthz` in CI.
