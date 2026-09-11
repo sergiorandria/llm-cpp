@@ -82,3 +82,4 @@
 - C29 Checkpointing: `TrainConfig::checkpointing` honored (recompute-always, on/off grads identical <1e-5).
 - C30 Extend: `GPT::extend_context(new)` wpe linear interp, shrink no-op, `test_ckpt_extend`. Track C complete (10/10).
 - D31 Resume: `Adam::save/load_state` (m/v/t/lr) + `Trainer::save/load_train_state` (model+opt+json step/seed), `test_resume` 5+5 ≡ 10 bit-exact.
+- D32 SafeTensors: F32 JSON-header + LE data (`checkpoint.h/cpp`), `gpt_named_params`, `test_safetensors` logits <1e-6.
