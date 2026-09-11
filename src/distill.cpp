@@ -53,7 +53,10 @@ void cache_teacher_logits(const GPT& teacher, const std::vector<std::vector<int>
 std::vector<Tensor> load_cached_logits(const std::string& path) {
     std::vector<Tensor> out;
     std::ifstream in(path, std::ios::binary);
-    if (!in) { std::cerr << "[distill] cannot open cache " << path << "\n"; return out; }
+    if (!in) {
+        std::cerr << "[distill] cannot open cache " << path << "\n";
+        return out;
+    }
     uint64_t n = 0;
     in.read((char*)&n, 8);
     for (uint64_t i = 0; i < n; ++i) {

@@ -1,6 +1,7 @@
-#include "llm/tokenizer.h"
 #include <cassert>
 #include <iostream>
+
+#include "llm/tokenizer.h"
 int main() {
     llm::Tokenizer tok(512);
     // emoji split across two chunks: full decode must equal streamed concat + empty carry
@@ -11,7 +12,8 @@ int main() {
     std::string carry;
     std::string o1 = tok.decode_incremental(c1, carry);
     std::string o2 = tok.decode_incremental(c2, carry);
-    std::string tail = carry; carry.clear();
+    std::string tail = carry;
+    carry.clear();
     assert(o1 + o2 + tail == s);
     assert(carry.empty());
     // single-byte stream never holds back

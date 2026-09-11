@@ -56,8 +56,8 @@ Tensor gqa_forward(const Tensor& x, const Tensor& Wq, const Tensor& Wk, const Te
     assert(Wk.shape[1] == n_kv_heads * head_dim);
     assert(Wv.shape[1] == n_kv_heads * head_dim);
     size_t T = x.shape[0];
-    Tensor Q = x.matmul(Wq);    // [T, nq*hd]
-    Tensor K = x.matmul(Wk);    // [T, nkv*hd]
+    Tensor Q = x.matmul(Wq);  // [T, nq*hd]
+    Tensor K = x.matmul(Wk);  // [T, nkv*hd]
     Tensor V = x.matmul(Wv);
     float scale = 1.0f / std::sqrt(float(head_dim));
     size_t group = n_heads / n_kv_heads;

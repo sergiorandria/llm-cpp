@@ -1,6 +1,7 @@
-#include "llm/tokenizer.h"
 #include <cassert>
 #include <iostream>
+
+#include "llm/tokenizer.h"
 int main() {
     auto p = llm::Tokenizer::split_pretokenize("Hello, world!");
     // ["Hello", ",", " world", "!"] — GPT-2 style: leading space attaches, comma splits
@@ -11,7 +12,8 @@ int main() {
     assert(q.size() >= 4);
     assert(q[0] == "I" && q[1] == "'d");
     bool has_num = false;
-    for (auto& t : q) if (t.find("42") != std::string::npos) has_num = true;
+    for (auto& t : q)
+        if (t.find("42") != std::string::npos) has_num = true;
     assert(has_num);
     // concat == original
     std::string cat;

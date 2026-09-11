@@ -1,8 +1,9 @@
 #pragma once
 // Central finite-difference grad-check helper (PRODUCTION_100 A02).
-#include "llm/tensor.h"
 #include <cmath>
 #include <functional>
+
+#include "llm/tensor.h"
 
 namespace llm::test {
 

@@ -1,12 +1,14 @@
 // Regression: Tensor::transpose must materialize views in logical order
 // (from_ndarray used to raw-copy shared storage, silently un-transposing).
-#include "llm/tensor.h"
 #include <cassert>
 #include <cmath>
 #include <iostream>
+
+#include "llm/tensor.h"
 int main() {
     llm::Tensor K({4, 3}, 0.0f);
-    for (size_t i = 0; i < 4; ++i) for (size_t j = 0; j < 3; ++j) K(i, j) = (float)(i * 10 + j);
+    for (size_t i = 0; i < 4; ++i)
+        for (size_t j = 0; j < 3; ++j) K(i, j) = (float)(i * 10 + j);
     llm::Tensor Kt = K.transpose();
     assert(Kt.shape[0] == 3 && Kt.shape[1] == 4);
     for (size_t i = 0; i < 3; ++i)

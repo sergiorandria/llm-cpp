@@ -1,8 +1,9 @@
-#include "llm/gguf.h"
-#include "llm/model.h"
 #include <cassert>
 #include <cstdio>
 #include <iostream>
+
+#include "llm/gguf.h"
+#include "llm/model.h"
 
 int main() {
     llm::Config cfg;
@@ -33,7 +34,7 @@ int main() {
     {
         auto p_mut = m2.parameters();
         if (!p_mut.empty() && p_mut[0]->data.size() > (size_t)cfg.n_embd + 1) {
-            size_t idx = 1 * cfg.n_embd; // token 1, dim 0
+            size_t idx = 1 * cfg.n_embd;  // token 1, dim 0
             p_mut[0]->data[idx] += 1.0f;
         } else if (!p_mut.empty() && !p_mut[0]->data.empty()) {
             p_mut[0]->data[0] += 1.0f;
@@ -41,7 +42,8 @@ int main() {
     }
     auto l2_before = m2.forward(prompt);
     float diff_before = 0;
-    for (size_t i = 0; i < l1.data.size(); ++i) diff_before += std::abs(l1.data[i] - l2_before.data[i]);
+    for (size_t i = 0; i < l1.data.size(); ++i)
+        diff_before += std::abs(l1.data[i] - l2_before.data[i]);
     std::cout << "pre-load diff " << diff_before << " (must be >1e-3)\n";
     assert(diff_before > 1e-3 && "perturbed init should differ before load");
 
@@ -74,7 +76,7 @@ int main() {
 
     // Mismatch test: load into model with different config should fail
     llm::Config cfg_bad = cfg;
-    cfg_bad.n_embd = 32; // different
+    cfg_bad.n_embd = 32;  // different
     llm::GPT m_bad(cfg_bad);
     bool ok_bad = llm::load_gguf(m_bad, path);
     assert(!ok_bad && "load with mismatched config should fail");

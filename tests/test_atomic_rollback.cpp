@@ -1,26 +1,34 @@
-#include "llm/model.h"
-#include "llm/trainer.h"
 #include <cassert>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <limits>
+
+#include "llm/model.h"
+#include "llm/trainer.h"
 int main() {
     llm::Config cfg;
-    cfg.vocab_size = 16; cfg.n_layers = 1; cfg.n_heads = 2; cfg.n_embd = 8; cfg.block_size = 8;
+    cfg.vocab_size = 16;
+    cfg.n_layers = 1;
+    cfg.n_heads = 2;
+    cfg.n_embd = 8;
+    cfg.block_size = 8;
     // H78: atomic save over existing path leaves valid loadable file, no .tmp
     llm::GPT m1(cfg);
     m1.save_binary_atomic("/tmp/atomic.bin");
-    for (auto p : m1.parameters()) for (auto& v : p->data) v += 1.0f;
+    for (auto p : m1.parameters())
+        for (auto& v : p->data) v += 1.0f;
     m1.save_binary_atomic("/tmp/atomic.bin");  // overwrite atomically
     bool no_tmp = !std::ifstream("/tmp/atomic.bin.tmp").good();
     assert(no_tmp);
     llm::GPT m2(cfg);
-    for (auto p : m2.parameters()) for (auto& v : p->data) v -= 5.0f;
+    for (auto p : m2.parameters())
+        for (auto& v : p->data) v -= 5.0f;
     m2.load_binary("/tmp/atomic.bin");
     float md = 0;
-    auto p1 = m1.parameters(); auto p2 = m2.parameters();
+    auto p1 = m1.parameters();
+    auto p2 = m2.parameters();
     for (size_t i = 0; i < p1.size(); ++i)
         for (size_t j = 0; j < p1[i]->data.size(); ++j)
             md = std::max(md, std::fabs(p1[i]->data[j] - p2[i]->data[j]));

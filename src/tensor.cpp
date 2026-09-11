@@ -46,7 +46,8 @@ void Tensor::compute_strides() {
 }
 
 void Tensor::require_f32(const char* op) const {
-    if (dtype == DType::I8) throw std::runtime_error(std::string(op) + " requires F32 tensor (dequantize first)");
+    if (dtype == DType::I8)
+        throw std::runtime_error(std::string(op) + " requires F32 tensor (dequantize first)");
 }
 
 void Tensor::quantize_to_int8() {
@@ -169,20 +170,23 @@ Tensor Tensor::matmul(const Tensor& other) const {
                 for (size_t j = 0; j < other.shape[1]; ++j) {
                     int32_t acc = 0;
                     for (size_t k = 0; k < shape[1]; ++k)
-                        acc += (int32_t)idata[i * shape[1] + k] * (int32_t)other.idata[k * other.shape[1] + j];
+                        acc += (int32_t)idata[i * shape[1] + k] *
+                               (int32_t)other.idata[k * other.shape[1] + j];
                     out.data[i * out.shape[1] + j] = (float)acc * sa * sb;
                 }
             }
             return out;
         }
         // F51: folded-scale mixed path (no materialized dequant pass).
-        //ij loop with per-operand scales (F32 operand scale = 1).
+        // ij loop with per-operand scales (F32 operand scale = 1).
         for (size_t i = 0; i < shape[0]; ++i) {
             for (size_t k = 0; k < shape[1]; ++k) {
-                float a = (dtype == DType::I8) ? (float)idata[i * shape[1] + k] : data[i * strides[0] + k * strides[1]];
+                float a = (dtype == DType::I8) ? (float)idata[i * shape[1] + k]
+                                               : data[i * strides[0] + k * strides[1]];
                 for (size_t j = 0; j < other.shape[1]; ++j) {
-                    float b = (other.dtype == DType::I8) ? (float)other.idata[k * other.shape[1] + j]
-                                                         : other.data[k * other.strides[0] + j * other.strides[1]];
+                    float b = (other.dtype == DType::I8)
+                                  ? (float)other.idata[k * other.shape[1] + j]
+                                  : other.data[k * other.strides[0] + j * other.strides[1]];
                     out.data[i * out.shape[1] + j] += a * b;
                 }
             }
@@ -195,11 +199,9 @@ Tensor Tensor::matmul(const Tensor& other) const {
     assert(shape[1] == other.shape[0]);
     Tensor out({shape[0], other.shape[1]}, 0.0f);
     // cblas_sgemm RowMajor: C = alpha*A*B + beta*C
-    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-                (int)shape[0], (int)other.shape[1], (int)shape[1],
-                1.0f, data.data(), (int)shape[1],
-                other.data.data(), (int)other.shape[1],
-                0.0f, out.data.data(), (int)out.shape[1]);
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, (int)shape[0], (int)other.shape[1],
+                (int)shape[1], 1.0f, data.data(), (int)shape[1], other.data.data(),
+                (int)other.shape[1], 0.0f, out.data.data(), (int)out.shape[1]);
     return out;
 #elif defined(USE_NUMPY_CPP)
     // Accelerated via numpy-cpp blocked GEMM (SIMD + threading)

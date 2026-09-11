@@ -1,7 +1,8 @@
-#include "llm/checkpoint.h"
 #include <cassert>
 #include <cmath>
 #include <iostream>
+
+#include "llm/checkpoint.h"
 // NOTE: never put side-effecting calls inside assert() — Release builds define
 // NDEBUG so assert() compiles to ((void)0) and the call never happens.
 int main() {

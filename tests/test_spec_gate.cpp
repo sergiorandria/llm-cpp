@@ -1,13 +1,18 @@
 // E48: speculative speedup gate — wall-clock spec vs greedy + equivalence.
 // Asserts equivalence (never speed — timing is informational for the dashboard).
-#include "llm/speculative.h"
-#include "llm/model.h"
 #include <cassert>
 #include <chrono>
 #include <iostream>
+
+#include "llm/model.h"
+#include "llm/speculative.h"
 int main() {
     llm::Config ct;
-    ct.vocab_size = 32; ct.n_embd = 16; ct.n_heads = 2; ct.n_layers = 4; ct.block_size = 64;
+    ct.vocab_size = 32;
+    ct.n_embd = 16;
+    ct.n_heads = 2;
+    ct.n_layers = 4;
+    ct.block_size = 64;
     ct.weight_tying = true;
     llm::Config cd = ct;
     cd.n_layers = 2;

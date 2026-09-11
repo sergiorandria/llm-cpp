@@ -1,13 +1,14 @@
-#include "llm/optimizer.h"
 #include <cassert>
 #include <cmath>
 #include <iostream>
+
+#include "llm/optimizer.h"
 int main() {
     // 1D params excluded from decay: with zero grad, 1D must stay, 2D must shrink by lr*wd
     llm::Tensor w2d({2, 2}, 1.0f);
     llm::Tensor b1d({2}, 1.0f);
     std::vector<llm::Tensor*> params = {&w2d, &b1d};
-    llm::Tensor g2({2,2}, 0.0f), g1({2}, 0.0f);
+    llm::Tensor g2({2, 2}, 0.0f), g1({2}, 0.0f);
     std::vector<llm::Tensor> grads = {g2, g1};
     llm::AdamW opt(0.1f, 0.9f, 0.999f, 1e-8f, 0.01f);
     opt.step(params, grads);
@@ -27,15 +28,16 @@ int main() {
     float prev = 1e30f;
     for (int t = 0; t < 20; ++t) {
         float x = p.data[0], y = p.data[1];
-        float loss = (1-x)*(1-x) + 100*(y-x*x)*(y-x*x);
+        float loss = (1 - x) * (1 - x) + 100 * (y - x * x) * (y - x * x);
         (void)loss;
         llm::Tensor g({2}, 0.0f);
-        g.data[0] = -2*(1-x) - 400*x*(y-x*x);
-        g.data[1] = 200*(y-x*x);
+        g.data[0] = -2 * (1 - x) - 400 * x * (y - x * x);
+        g.data[1] = 200 * (y - x * x);
         std::vector<llm::Tensor*> pp = {&p};
         std::vector<llm::Tensor> gg = {g};
         adam.step(pp, gg);
-        float nl = (1-p.data[0])*(1-p.data[0]) + 100*(p.data[1]-p.data[0]*p.data[0])*(p.data[1]-p.data[0]*p.data[0]);
+        float nl = (1 - p.data[0]) * (1 - p.data[0]) +
+                   100 * (p.data[1] - p.data[0] * p.data[0]) * (p.data[1] - p.data[0] * p.data[0]);
         if (t > 5) assert(nl < prev + 1e-3);
         prev = nl;
     }

@@ -88,7 +88,7 @@ float Trainer::train_step(const std::vector<int>& batch) {
     // Real backward: zero grads, compute dlogits, backprop through entire model
     model_.zero_grad();
     Tensor dlogits = cross_entropy_backward(logits, batch, cfg_.label_smoothing);
-    if (cfg_.loss_scale != 1.0f) dlogits = dlogits.scale(cfg_.loss_scale); // A09
+    if (cfg_.loss_scale != 1.0f) dlogits = dlogits.scale(cfg_.loss_scale);  // A09
     model_.backward(dlogits, batch, hidden);
     // Collect grads from parameters' grad fields
     auto params = model_.parameters();
@@ -100,18 +100,21 @@ float Trainer::train_step(const std::vector<int>& batch) {
         // else stays zero (should have been set by backward)
         grads.push_back(std::move(g));
     }
-    if (cfg_.loss_scale != 1.0f) // A09: unscale before clip/optimizer
-        for (auto& g : grads) for (auto& v : g.data) v /= cfg_.loss_scale;
-    if (has_nonfinite(grads)) { // A07: skip step, keep last good params
+    if (cfg_.loss_scale != 1.0f)  // A09: unscale before clip/optimizer
+        for (auto& g : grads)
+            for (auto& v : g.data) v /= cfg_.loss_scale;
+    if (has_nonfinite(grads)) {  // A07: skip step, keep last good params
         ++skipped_;
-        std::cerr << "[trainer] non-finite grad at step " << step_ << " — skipping optimizer step\n";
+        std::cerr << "[trainer] non-finite grad at step " << step_
+                  << " — skipping optimizer step\n";
         return loss;
     }
     clip_grads(grads);
     // D37 metrics
     last_loss_ = loss;
     double n2 = 0;
-    for (auto& g : grads) for (float v : g.data) n2 += (double)v * v;
+    for (auto& g : grads)
+        for (float v : g.data) n2 += (double)v * v;
     last_grad_norm_ = (float)std::sqrt(n2);
     float lr = sched_.get_lr(step_);
     optim_.set_lr(lr);
@@ -143,11 +146,18 @@ float Trainer::train_step_accum(const std::vector<int>& micro_batch) {
     if (accum_count_ < K) return loss;
     // average, then clip/step like train_step
     std::vector<Tensor> grads = accum_;
-    for (auto& g : grads) for (auto& v : g.data) v /= (float)K;
-    if (has_nonfinite(grads)) { ++skipped_; accum_count_ = 0; for (auto& a : accum_) a.fill(0); return loss; }
+    for (auto& g : grads)
+        for (auto& v : g.data) v /= (float)K;
+    if (has_nonfinite(grads)) {
+        ++skipped_;
+        accum_count_ = 0;
+        for (auto& a : accum_) a.fill(0);
+        return loss;
+    }
     clip_grads(grads);
     double n2 = 0;
-    for (auto& g : grads) for (float v : g.data) n2 += (double)v * v;
+    for (auto& g : grads)
+        for (float v : g.data) n2 += (double)v * v;
     last_grad_norm_ = (float)std::sqrt(n2);
     float lr = sched_.get_lr(step_);
     optim_.set_lr(lr);
@@ -164,9 +174,11 @@ void mean_reduce_grads(const std::vector<std::vector<Tensor>>& shard_grads,
     out = shard_grads[0];
     for (size_t s = 1; s < shard_grads.size(); ++s)
         for (size_t i = 0; i < out.size(); ++i)
-            for (size_t j = 0; j < out[i].data.size(); ++j) out[i].data[j] += shard_grads[s][i].data[j];
+            for (size_t j = 0; j < out[i].data.size(); ++j)
+                out[i].data[j] += shard_grads[s][i].data[j];
     float inv = 1.0f / (float)shard_grads.size();
-    for (auto& g : out) for (auto& v : g.data) v *= inv;
+    for (auto& g : out)
+        for (auto& v : g.data) v *= inv;
 }
 float Trainer::evaluate(Dataset& ds) {
     auto tokens = ds.tokens();
@@ -181,23 +193,35 @@ void Trainer::save_checkpoint(const std::string& path) {
 }
 void Trainer::save_train_state(const std::string& prefix) {
     std::filesystem::create_directories(std::filesystem::path(prefix).parent_path().string().empty()
-        ? "." : std::filesystem::path(prefix).parent_path().string());
+                                            ? "."
+                                            : std::filesystem::path(prefix).parent_path().string());
     model_.save_binary(prefix + ".model.bin");
-    { std::ofstream os(prefix + ".opt.bin", std::ios::binary); optim_.save_state(os); }
-    { std::ofstream js(prefix + ".json"); js << "{\"step\":" << step_ << ",\"skipped\":" << skipped_
-        << ",\"seed\":" << global_seed() << "}\n"; }
+    {
+        std::ofstream os(prefix + ".opt.bin", std::ios::binary);
+        optim_.save_state(os);
+    }
+    {
+        std::ofstream js(prefix + ".json");
+        js << "{\"step\":" << step_ << ",\"skipped\":" << skipped_ << ",\"seed\":" << global_seed()
+           << "}\n";
+    }
 }
 void Trainer::load_train_state(const std::string& prefix) {
     model_.load_binary(prefix + ".model.bin");
-    { std::ifstream is(prefix + ".opt.bin", std::ios::binary); if (is) optim_.load_state(is); }
+    {
+        std::ifstream is(prefix + ".opt.bin", std::ios::binary);
+        if (is) optim_.load_state(is);
+    }
     std::ifstream js(prefix + ".json");
     if (js) {
         std::string s((std::istreambuf_iterator<char>(js)), {});
         auto num = [&](const char* k) {
-            auto p = s.find(k); if (p == std::string::npos) return 0;
+            auto p = s.find(k);
+            if (p == std::string::npos) return 0;
             return std::stoi(s.substr(s.find(':', p) + 1));
         };
-        step_ = num("\"step\""); skipped_ = num("\"skipped\"");
+        step_ = num("\"step\"");
+        skipped_ = num("\"skipped\"");
         set_global_seed((uint64_t)num("\"seed\""));
     }
 }

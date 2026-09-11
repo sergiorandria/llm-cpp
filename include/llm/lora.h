@@ -3,18 +3,23 @@
 namespace llm {
 // LoRA adapter: W' = W + A·B * (alpha/r)
 // rank r=8 by default, A [in, r], B [r, out] — ~0.1% params
-struct LoRAConfig { size_t rank=8; float alpha=16.0f; float dropout=0.0f; };
+struct LoRAConfig {
+    size_t rank = 8;
+    float alpha = 16.0f;
+    float dropout = 0.0f;
+};
 class LoRAAdapter {
-public:
-    LoRAAdapter(size_t in_dim, size_t out_dim, LoRAConfig cfg={});
-    Tensor forward(const Tensor& x) const; // x [T, in] -> [T, out]
+   public:
+    LoRAAdapter(size_t in_dim, size_t out_dim, LoRAConfig cfg = {});
+    Tensor forward(const Tensor& x) const;  // x [T, in] -> [T, out]
     // C27: delta = (A·B) * alpha/r; merge adds delta into W, unmerge subtracts it
     Tensor delta() const;
     void merge_into(Tensor& W) const;
     void unmerge_from(Tensor& W) const;
     std::vector<Tensor*> parameters();
-private:
+
+   private:
     LoRAConfig cfg_;
-    Tensor A_, B_; // [in, r], [r, out]
+    Tensor A_, B_;  // [in, r], [r, out]
 };
-}
+}  // namespace llm

@@ -21,4 +21,4 @@ bool cuda_available() {
     return false;
 #endif
 }
-} // namespace llm
+}  // namespace llm

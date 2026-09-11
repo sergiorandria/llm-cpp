@@ -1,10 +1,11 @@
 // G63: stable C ABI for Python (ctypes) and other FFIs. No pybind11 needed.
-#include "llm/config.h"
-#include "llm/model.h"
-#include "llm/tokenizer.h"
 #include <cstring>
 #include <string>
 #include <vector>
+
+#include "llm/config.h"
+#include "llm/model.h"
+#include "llm/tokenizer.h"
 
 struct llm_model {
     llm::GPT* gpt;
@@ -15,8 +16,11 @@ extern "C" {
 
 llm_model* llm_create(size_t vocab, size_t layers, size_t heads, size_t embd, size_t block) {
     llm::Config c;
-    c.vocab_size = vocab; c.n_layers = layers; c.n_heads = heads;
-    c.n_embd = embd; c.block_size = block;
+    c.vocab_size = vocab;
+    c.n_layers = layers;
+    c.n_heads = heads;
+    c.n_embd = embd;
+    c.block_size = block;
     if (!llm::validate_config(c)) return nullptr;
     auto* m = new llm_model{new llm::GPT(c), new llm::Tokenizer(256)};
     return m;
@@ -66,4 +70,4 @@ size_t llm_num_parameters(const llm_model* m) {
     return m->gpt->num_parameters();
 }
 
-} // extern "C"
+}  // extern "C"

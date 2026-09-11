@@ -1,8 +1,9 @@
-#include "llm/attention.h"
-#include "llm/flash_attention.h"
 #include <cassert>
 #include <cmath>
 #include <iostream>
+
+#include "llm/attention.h"
+#include "llm/flash_attention.h"
 int main() {
     // Full vs incremental equivalence (T=8, small -> naive path)
     llm::MultiHeadAttention attn(16, 4, 32, false);

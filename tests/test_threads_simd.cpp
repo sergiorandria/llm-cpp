@@ -1,10 +1,11 @@
 // I81: LLM_THREADS honored. I82: accelerated matmul == naive reference.
-#include "llm/tensor.h"
-#include "llm/utils.h"
 #include <cassert>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+
+#include "llm/tensor.h"
+#include "llm/utils.h"
 int main() {
     // I81
     setenv("LLM_THREADS", "2", 1);

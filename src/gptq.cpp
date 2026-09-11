@@ -1,12 +1,13 @@
 #include "llm/gptq.h"
-#include "llm/checkpoint.h"
-#include "llm/model.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+
+#include "llm/checkpoint.h"
+#include "llm/model.h"
 
 namespace llm {
 
@@ -82,7 +83,10 @@ void save_gptq(const std::string& path, const std::vector<GPTQEntry>& entries) {
     auto write_t = [&](const Tensor& t) {
         uint64_t nd = t.shape.size();
         out.write((char*)&nd, 8);
-        for (auto d : t.shape) { uint64_t v = d; out.write((char*)&v, 8); }
+        for (auto d : t.shape) {
+            uint64_t v = d;
+            out.write((char*)&v, 8);
+        }
         uint64_t m = t.data.size();
         out.write((char*)&m, 8);
         out.write((char*)t.data.data(), m * sizeof(float));
@@ -100,18 +104,28 @@ void save_gptq(const std::string& path, const std::vector<GPTQEntry>& entries) {
 std::vector<GPTQEntry> load_gptq(const std::string& path) {
     std::vector<GPTQEntry> entries;
     std::ifstream in(path, std::ios::binary);
-    if (!in) { std::cerr << "[gptq] cannot open " << path << "\n"; return entries; }
+    if (!in) {
+        std::cerr << "[gptq] cannot open " << path << "\n";
+        return entries;
+    }
     uint32_t magic = 0, ver = 0;
     in.read((char*)&magic, 4);
     in.read((char*)&ver, 4);
-    if (magic != 0x47505451) { std::cerr << "[gptq] bad magic\n"; return entries; }
+    if (magic != 0x47505451) {
+        std::cerr << "[gptq] bad magic\n";
+        return entries;
+    }
     uint64_t n = 0;
     in.read((char*)&n, 8);
     auto read_t = [&](Tensor& t) {
         uint64_t nd = 0;
         in.read((char*)&nd, 8);
         std::vector<size_t> shape(nd);
-        for (uint64_t i = 0; i < nd; ++i) { uint64_t v = 0; in.read((char*)&v, 8); shape[i] = v; }
+        for (uint64_t i = 0; i < nd; ++i) {
+            uint64_t v = 0;
+            in.read((char*)&v, 8);
+            shape[i] = v;
+        }
         uint64_t m = 0;
         in.read((char*)&m, 8);
         t = Tensor(shape, 0.0f);
@@ -145,7 +159,8 @@ Tensor channel_act_mag(const Tensor& activations) {
     return mag;
 }
 
-std::pair<Tensor, Tensor> awq_rescale_for_quant(const Tensor& weight, const Tensor& act_mag, float alpha) {
+std::pair<Tensor, Tensor> awq_rescale_for_quant(const Tensor& weight, const Tensor& act_mag,
+                                                float alpha) {
     // weight [in, out] scaled per input channel: W'[:,j] rows? We scale per ROW (in-channel):
     // s_i = (mag_i / max)^alpha; W'[i,j] = W[i,j]*s_i; inv[i] = 1/s_i.
     assert(weight.shape.size() == 2 && act_mag.data.size() == weight.shape[0]);

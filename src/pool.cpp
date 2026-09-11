@@ -1,4 +1,5 @@
 #include "llm/pool.h"
+
 #include "llm/tensor.h"
 namespace llm {
 size_t TensorPool::key(const std::vector<size_t>& shape) {
@@ -32,4 +33,4 @@ size_t TensorPool::cached() const {
     for (auto& kv : free_) n += kv.second.size();
     return n;
 }
-} // namespace llm
+}  // namespace llm

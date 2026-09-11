@@ -1,17 +1,23 @@
 // F59: quantization degradation gate — fails if int8 ppl drifts >5% or 4-bit err >0.5.
-#include "llm/gptq.h"
-#include "llm/loss.h"
-#include "llm/quantize.h"
-#include "llm/tokenizer.h"
 #include <cassert>
 #include <cmath>
 #include <fstream>
 #include <iostream>
+
+#include "llm/gptq.h"
+#include "llm/loss.h"
+#include "llm/quantize.h"
+#include "llm/tokenizer.h"
 int main() {
     llm::Config cfg;
-    cfg.vocab_size = 256; cfg.n_layers = 1; cfg.n_heads = 2; cfg.n_embd = 16; cfg.block_size = 64;
+    cfg.vocab_size = 256;
+    cfg.n_layers = 1;
+    cfg.n_heads = 2;
+    cfg.n_embd = 16;
+    cfg.block_size = 64;
     llm::GPT m1(cfg), m2(cfg);
-    auto p1 = m1.parameters(); auto p2 = m2.parameters();
+    auto p1 = m1.parameters();
+    auto p2 = m2.parameters();
     for (size_t i = 0; i < p1.size(); ++i) p2[i]->data = p1[i]->data;
     // calib batch: raw bytes of data/calib/calib.txt (byte-level tokenizer => byte ids)
     std::ifstream in("data/calib/calib.txt", std::ios::binary);

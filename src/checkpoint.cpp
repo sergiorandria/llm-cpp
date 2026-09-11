@@ -1,5 +1,5 @@
 #include "llm/checkpoint.h"
-#include "llm/model.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -7,9 +7,11 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+
+#include "llm/model.h"
 namespace llm {
-Tensor checkpointed_forward(const Tensor& x, const CheckpointConfig& cfg){
-    if(!cfg.enabled) return x;
+Tensor checkpointed_forward(const Tensor& x, const CheckpointConfig& cfg) {
+    if (!cfg.enabled) return x;
     // Stub: in real autograd we'd not stash activations, here we just return x
     // to demonstrate API; memory saving would be O(segment) vs O(layers)
     (void)cfg;
@@ -38,8 +40,8 @@ void save_safetensors(const std::string& path,
     uint64_t hlen = header.size();
     out.write((char*)&hlen, 8);
     out.write(header.data(), header.size());
-    for (auto& kv : named) out.write((char*)kv.second->data.data(),
-                                     kv.second->data.size() * sizeof(float));
+    for (auto& kv : named)
+        out.write((char*)kv.second->data.data(), kv.second->data.size() * sizeof(float));
 }
 
 static std::string read_json_string(const std::string& j, size_t& i) {
@@ -54,13 +56,19 @@ static std::string read_json_string(const std::string& j, size_t& i) {
 void load_safetensors(const std::string& path,
                       const std::vector<std::pair<std::string, Tensor*>>& named) {
     std::ifstream in(path, std::ios::binary);
-    if (!in) { std::cerr << "[safetensors] cannot open " << path << "\n"; return; }
+    if (!in) {
+        std::cerr << "[safetensors] cannot open " << path << "\n";
+        return;
+    }
     uint64_t hlen = 0;
     in.read((char*)&hlen, 8);
     std::string header(hlen, '\0');
     in.read(header.data(), hlen);
     // parse entries: "name":{"dtype":"F32","shape":[...],"data_offsets":[s,e]}
-    struct Ent { std::vector<size_t> shape; size_t s, e; };
+    struct Ent {
+        std::vector<size_t> shape;
+        size_t s, e;
+    };
     std::vector<std::pair<std::string, Ent>> ents;
     size_t i = 0;
     while (i < header.size()) {
@@ -71,8 +79,18 @@ void load_safetensors(const std::string& path,
         // skip to '{' or ',' / '}'
         while (i < header.size() && header[i] != '{' && header[i] != ',' && header[i] != '}') ++i;
         if (i >= header.size() || header[i] != '{') continue;
-        ++i; // into object (or __metadata__)
-        if (key == "__metadata__") { int depth = 1; while (i < header.size() && depth) { if (header[i]=='{') ++depth; else if (header[i]=='}') --depth; ++i; } continue; }
+        ++i;  // into object (or __metadata__)
+        if (key == "__metadata__") {
+            int depth = 1;
+            while (i < header.size() && depth) {
+                if (header[i] == '{')
+                    ++depth;
+                else if (header[i] == '}')
+                    --depth;
+                ++i;
+            }
+            continue;
+        }
         // find shape [...]
         auto ps = header.find('[', i);
         auto pe = header.find(']', ps);
@@ -81,7 +99,8 @@ void load_safetensors(const std::string& path,
             std::string arr = header.substr(ps + 1, pe - ps - 1);
             std::stringstream ss(arr);
             std::string tok;
-            while (std::getline(ss, tok, ',')) if (!tok.empty()) shape.push_back(std::stoul(tok));
+            while (std::getline(ss, tok, ','))
+                if (!tok.empty()) shape.push_back(std::stoul(tok));
         }
         auto po = header.find('[', pe + 1);
         auto po2 = header.find(']', po);
@@ -131,11 +150,16 @@ BestKeeper::BestKeeper(const std::string& dir, size_t keep_n) : dir_(dir), keep_
     std::filesystem::create_directories(dir_);
 }
 bool BestKeeper::consider(int step, float ppl) {
-    std::string path = dir_ + "/ckpt_step" + std::to_string(step) + "_ppl" + std::to_string(ppl) + ".bin";
+    std::string path =
+        dir_ + "/ckpt_step" + std::to_string(step) + "_ppl" + std::to_string(ppl) + ".bin";
     kept_.emplace_back(ppl, path);
     std::sort(kept_.begin(), kept_.end());
     bool in_top = false;
-    for (auto& k : kept_) if (k.second == path) { in_top = &k - &kept_[0] < (long)keep_n_; break; }
+    for (auto& k : kept_)
+        if (k.second == path) {
+            in_top = &k - &kept_[0] < (long)keep_n_;
+            break;
+        }
     while (kept_.size() > keep_n_) {
         // evict worst (no file deletion here — caller manages files; we just forget)
         kept_.pop_back();
@@ -148,4 +172,4 @@ bool BestKeeper::consider(int step, float ppl) {
     }
     return in_top;
 }
-}
+}  // namespace llm

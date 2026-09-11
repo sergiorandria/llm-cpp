@@ -1,28 +1,35 @@
 #include "llm/optimizer.h"
+
 #include <cmath>
 #include <iostream>
 namespace llm {
-void SGD::step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads){
-    for(size_t i=0;i<params.size() && i<grads.size(); ++i){
-        for(size_t j=0;j<params[i]->data.size(); ++j) params[i]->data[j] -= lr_ * grads[i].data[j];
+void SGD::step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads) {
+    for (size_t i = 0; i < params.size() && i < grads.size(); ++i) {
+        for (size_t j = 0; j < params[i]->data.size(); ++j)
+            params[i]->data[j] -= lr_ * grads[i].data[j];
     }
 }
-Adam::Adam(float lr, float b1, float b2, float eps): lr_(lr), b1_(b1), b2_(b2), eps_(eps){}
-void Adam::step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads){
+Adam::Adam(float lr, float b1, float b2, float eps) : lr_(lr), b1_(b1), b2_(b2), eps_(eps) {}
+void Adam::step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads) {
     ++t_;
-    if(m_.empty()){ m_=grads; v_=grads; for(auto &t: m_) std::fill(t.data.begin(), t.data.end(), 0); for(auto &t: v_) std::fill(t.data.begin(), t.data.end(), 0); }
-    for(size_t i=0;i<params.size() && i<grads.size(); ++i){
-        for(size_t j=0;j<params[i]->data.size(); ++j){
-            m_[i].data[j]=b1_*m_[i].data[j]+(1-b1_)*grads[i].data[j];
-            v_[i].data[j]=b2_*v_[i].data[j]+(1-b2_)*grads[i].data[j]*grads[i].data[j];
-            float mhat=m_[i].data[j]/(1-std::pow(b1_,t_));
-            float vhat=v_[i].data[j]/(1-std::pow(b2_,t_));
-            params[i]->data[j] -= lr_ * mhat / (std::sqrt(vhat)+eps_);
+    if (m_.empty()) {
+        m_ = grads;
+        v_ = grads;
+        for (auto& t : m_) std::fill(t.data.begin(), t.data.end(), 0);
+        for (auto& t : v_) std::fill(t.data.begin(), t.data.end(), 0);
+    }
+    for (size_t i = 0; i < params.size() && i < grads.size(); ++i) {
+        for (size_t j = 0; j < params[i]->data.size(); ++j) {
+            m_[i].data[j] = b1_ * m_[i].data[j] + (1 - b1_) * grads[i].data[j];
+            v_[i].data[j] = b2_ * v_[i].data[j] + (1 - b2_) * grads[i].data[j] * grads[i].data[j];
+            float mhat = m_[i].data[j] / (1 - std::pow(b1_, t_));
+            float vhat = v_[i].data[j] / (1 - std::pow(b2_, t_));
+            params[i]->data[j] -= lr_ * mhat / (std::sqrt(vhat) + eps_);
         }
     }
 }
-AdamW::AdamW(float lr, float b1, float b2, float eps, float wd): Adam(lr,b1,b2,eps), wd_(wd){}
-void AdamW::step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads){
+AdamW::AdamW(float lr, float b1, float b2, float eps, float wd) : Adam(lr, b1, b2, eps), wd_(wd) {}
+void AdamW::step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads) {
     std::vector<char> auto_decay(params.size(), 0);
     for (size_t i = 0; i < params.size(); ++i) auto_decay[i] = default_decay(*params[i]) ? 1 : 0;
     step(params, grads, auto_decay);
@@ -56,7 +63,10 @@ float clip_by_global_norm(std::vector<Tensor>& grads, float max_norm) {
 static void write_tensor_state(std::ostream& os, const Tensor& t) {
     uint64_t nd = t.shape.size();
     os.write((char*)&nd, 8);
-    for (auto d : t.shape) { uint64_t v = d; os.write((char*)&v, 8); }
+    for (auto d : t.shape) {
+        uint64_t v = d;
+        os.write((char*)&v, 8);
+    }
     uint64_t n = t.data.size();
     os.write((char*)&n, 8);
     os.write((char*)t.data.data(), n * sizeof(float));
@@ -65,17 +75,23 @@ static void read_tensor_state(std::istream& is, Tensor& t) {
     uint64_t nd = 0;
     is.read((char*)&nd, 8);
     std::vector<size_t> shape(nd);
-    for (uint64_t i = 0; i < nd; ++i) { uint64_t v = 0; is.read((char*)&v, 8); shape[i] = v; }
+    for (uint64_t i = 0; i < nd; ++i) {
+        uint64_t v = 0;
+        is.read((char*)&v, 8);
+        shape[i] = v;
+    }
     uint64_t n = 0;
     is.read((char*)&n, 8);
     t = Tensor(shape, 0.0f);
     is.read((char*)t.data.data(), n * sizeof(float));
 }
 void Adam::save_state(std::ostream& os) const {
-    uint32_t magic = 0x4144414D; // "ADAM"
+    uint32_t magic = 0x4144414D;  // "ADAM"
     os.write((char*)&magic, 4);
-    os.write((char*)&lr_, 4); os.write((char*)&b1_, 4);
-    os.write((char*)&b2_, 4); os.write((char*)&eps_, 4);
+    os.write((char*)&lr_, 4);
+    os.write((char*)&b1_, 4);
+    os.write((char*)&b2_, 4);
+    os.write((char*)&eps_, 4);
     os.write((char*)&t_, 4);
     uint64_t n = m_.size();
     os.write((char*)&n, 8);
@@ -87,16 +103,31 @@ void Adam::save_state(std::ostream& os) const {
 void Adam::load_state(std::istream& is) {
     uint32_t magic = 0;
     is.read((char*)&magic, 4);
-    if (magic != 0x4144414D) { std::cerr << "[adam] bad state magic\n"; return; }
-    is.read((char*)&lr_, 4); is.read((char*)&b1_, 4);
-    is.read((char*)&b2_, 4); is.read((char*)&eps_, 4);
+    if (magic != 0x4144414D) {
+        std::cerr << "[adam] bad state magic\n";
+        return;
+    }
+    is.read((char*)&lr_, 4);
+    is.read((char*)&b1_, 4);
+    is.read((char*)&b2_, 4);
+    is.read((char*)&eps_, 4);
     is.read((char*)&t_, 4);
     uint64_t n = 0;
     is.read((char*)&n, 8);
-    m_.clear(); m_.reserve(n);
-    for (uint64_t i = 0; i < n; ++i) { Tensor t; read_tensor_state(is, t); m_.push_back(std::move(t)); }
+    m_.clear();
+    m_.reserve(n);
+    for (uint64_t i = 0; i < n; ++i) {
+        Tensor t;
+        read_tensor_state(is, t);
+        m_.push_back(std::move(t));
+    }
     is.read((char*)&n, 8);
-    v_.clear(); v_.reserve(n);
-    for (uint64_t i = 0; i < n; ++i) { Tensor t; read_tensor_state(is, t); v_.push_back(std::move(t)); }
+    v_.clear();
+    v_.reserve(n);
+    for (uint64_t i = 0; i < n; ++i) {
+        Tensor t;
+        read_tensor_state(is, t);
+        v_.push_back(std::move(t));
+    }
 }
-}
+}  // namespace llm

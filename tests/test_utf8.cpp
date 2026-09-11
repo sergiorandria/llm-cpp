@@ -1,7 +1,8 @@
-#include "llm/tokenizer.h"
 #include <cassert>
 #include <fstream>
 #include <iostream>
+
+#include "llm/tokenizer.h"
 int main() {
     llm::Tokenizer tok(512);
     // ASCII

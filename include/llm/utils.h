@@ -13,4 +13,4 @@ uint64_t global_seed();
 int init_threading();
 // I82: compile-time SIMD capability string (e.g. "AVX2+OpenMP", "NEON", "scalar")
 std::string simd_caps();
-}
+}  // namespace llm

@@ -208,17 +208,18 @@ Tensor TransformerBlock::forward(const Tensor& x) const {
     return out;
 }
 
-Tensor TransformerBlock::forward_incremental(const Tensor& x, KVCache& cache, size_t layer, size_t pos) const {
+Tensor TransformerBlock::forward_incremental(const Tensor& x, KVCache& cache, size_t layer,
+                                             size_t pos) const {
     // x: [1, C] single token
-    assert(x.shape[0]==1);
+    assert(x.shape[0] == 1);
     Tensor ln1 = use_rmsnorm_ ? x.rmsnorm(&ln1_gamma_) : x.layernorm(&ln1_gamma_, &ln1_beta_);
     Tensor attn_out = attn_.forward_incremental(ln1, cache, layer, pos);
     Tensor y(x.shape, 0.0f);
-    for(size_t i=0;i<y.data.size();++i) y.data[i]=x.data[i]+attn_out.data[i];
+    for (size_t i = 0; i < y.data.size(); ++i) y.data[i] = x.data[i] + attn_out.data[i];
     Tensor ln2 = use_rmsnorm_ ? y.rmsnorm(&ln2_gamma_) : y.layernorm(&ln2_gamma_, &ln2_beta_);
     Tensor ffn_out = ffn_.forward(ln2);
     Tensor out(y.shape, 0.0f);
-    for(size_t i=0;i<out.data.size();++i) out.data[i]=y.data[i]+ffn_out.data[i];
+    for (size_t i = 0; i < out.data.size(); ++i) out.data[i] = y.data[i] + ffn_out.data[i];
     return out;
 }
 Tensor TransformerBlock::backward(const Tensor& x, const Tensor& grad_out) const {

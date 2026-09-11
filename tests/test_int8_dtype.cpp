@@ -1,11 +1,13 @@
-#include "llm/quantize.h"
 #include <cassert>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
+
+#include "llm/quantize.h"
 int main() {
     llm::Tensor x({4, 4}, 0.0f);
-    for (size_t i = 0; i < x.data.size(); ++i) x.data[i] = (i % 2 ? 0.5f : -0.5f) * (float)(i * 0.1);
+    for (size_t i = 0; i < x.data.size(); ++i)
+        x.data[i] = (i % 2 ? 0.5f : -0.5f) * (float)(i * 0.1);
     // F51: real I8 storage
     llm::Tensor q = llm::quantize_int8(x);
     assert(q.is_int8());
@@ -30,15 +32,24 @@ int main() {
     auto y_fp = A.matmul(W);
     assert(!y_q.is_int8());
     float md = 0;
-    for (size_t i = 0; i < y_q.data.size(); ++i) md = std::max(md, std::fabs(y_q.data[i]-y_fp.data[i]));
+    for (size_t i = 0; i < y_q.data.size(); ++i)
+        md = std::max(md, std::fabs(y_q.data[i] - y_fp.data[i]));
     std::cout << "i8 matmul maxd=" << md << "\n";
     assert(md < 0.15f);
     // fp32-only ops reject I8 with clear error
     bool threw = false;
-    try { (void)Wq.layernorm(nullptr, nullptr); } catch (const std::runtime_error& e) { threw = true; }
+    try {
+        (void)Wq.layernorm(nullptr, nullptr);
+    } catch (const std::runtime_error& e) {
+        threw = true;
+    }
     assert(threw);
     threw = false;
-    try { (void)Wq.softmax(); } catch (const std::runtime_error&) { threw = true; }
+    try {
+        (void)Wq.softmax();
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
     assert(threw);
     // scale() on I8 folds into scale exactly
     auto qs = Wq.scale(2.0f);
@@ -48,7 +59,8 @@ int main() {
     Aq.quantize_to_int8();
     auto y_qq = Aq.matmul(Wq);
     float md2 = 0;
-    for (size_t i = 0; i < y_qq.data.size(); ++i) md2 = std::max(md2, std::fabs(y_qq.data[i]-y_fp.data[i]));
+    for (size_t i = 0; i < y_qq.data.size(); ++i)
+        md2 = std::max(md2, std::fabs(y_qq.data[i] - y_fp.data[i]));
     std::cout << "i8xi8 maxd=" << md2 << "\n";
     assert(md2 < 0.3f);
     std::cout << "int8 dtype test passed\n";

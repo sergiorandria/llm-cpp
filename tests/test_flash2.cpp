@@ -1,7 +1,8 @@
-#include "llm/flash_attention.h"
 #include <cassert>
 #include <cmath>
 #include <iostream>
+
+#include "llm/flash_attention.h"
 int main() {
     const size_t T = 40, D = 8;
     llm::Tensor Q({T, D}, 0.0f), K({T, D}, 0.0f), V({T, D}, 0.0f);
@@ -16,7 +17,9 @@ int main() {
         auto Kt = K.transpose();
         auto S = Q.matmul(Kt);
         for (auto& v : S.data) v *= scale;
-        if (causal) for (size_t i = 0; i < T; ++i) for (size_t j = i + 1; j < T; ++j) S(i, j) = -1e9f;
+        if (causal)
+            for (size_t i = 0; i < T; ++i)
+                for (size_t j = i + 1; j < T; ++j) S(i, j) = -1e9f;
         auto A = S.softmax(1);
         auto y_ref = A.matmul(V);
         float m1 = 0, m2 = 0;

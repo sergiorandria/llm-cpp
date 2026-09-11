@@ -1,11 +1,16 @@
 #pragma once
-#include "tensor.h"
-#include "pool.h"
 #include <vector>
+
+#include "pool.h"
+#include "tensor.h"
 namespace llm {
-struct KVCacheConfig { bool soa = false; bool paged = false; size_t page_size = 16; }; // SoA [n_embd, max_seq_len] better for head slices
+struct KVCacheConfig {
+    bool soa = false;
+    bool paged = false;
+    size_t page_size = 16;
+};  // SoA [n_embd, max_seq_len] better for head slices
 class KVCache {
-public:
+   public:
     KVCache(size_t n_layers, size_t max_seq_len, size_t n_embd, KVCacheConfig cfg = {});
     void update(size_t layer, const Tensor& k, const Tensor& v);
     Tensor get_k(size_t layer) const;
@@ -18,13 +23,26 @@ public:
     void evict();
     size_t num_pages(size_t layer) const;
     // I85/I86: optional shared pool — evicted pages return to the pool for reuse
-    void set_pool(TensorPool* pool) { pool_ = pool; }
-    size_t size() const { return cur_len_; }
-    void set_size(size_t n) { cur_len_ = std::min(n, max_seq_len_); }
-    void advance(size_t n) { cur_len_ = std::min(cur_len_ + n, max_seq_len_); }
-    bool is_soa() const { return cfg_.soa; }
-    bool is_paged() const { return cfg_.paged; }
-private:
+    void set_pool(TensorPool* pool) {
+        pool_ = pool;
+    }
+    size_t size() const {
+        return cur_len_;
+    }
+    void set_size(size_t n) {
+        cur_len_ = std::min(n, max_seq_len_);
+    }
+    void advance(size_t n) {
+        cur_len_ = std::min(cur_len_ + n, max_seq_len_);
+    }
+    bool is_soa() const {
+        return cfg_.soa;
+    }
+    bool is_paged() const {
+        return cfg_.paged;
+    }
+
+   private:
     size_t n_layers_, max_seq_len_, n_embd_;
     KVCacheConfig cfg_;
     std::vector<Tensor> k_cache_, v_cache_;
@@ -32,6 +50,6 @@ private:
     std::vector<std::vector<Tensor>> pages_k_, pages_v_;
     void ensure_page(size_t layer, size_t page) const;
     TensorPool* pool_ = nullptr;
-    size_t cur_len_=0;
+    size_t cur_len_ = 0;
 };
-}
+}  // namespace llm

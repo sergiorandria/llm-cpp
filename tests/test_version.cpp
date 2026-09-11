@@ -1,8 +1,9 @@
 // J91: generated version is non-empty and well-formed.
-#include "llm/version.h"
 #include <cassert>
 #include <iostream>
 #include <string>
+
+#include "llm/version.h"
 int main() {
     std::string v = LLM_CPP_VERSION;
     assert(!v.empty());

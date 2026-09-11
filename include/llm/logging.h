@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
-#include <string>
 #include <iostream>
+#include <string>
 namespace llm {
 enum class LogLevel { DEBUG, INFO, WARN, ERROR };
 void log(LogLevel lvl, const std::string& msg);
@@ -14,10 +14,11 @@ std::string format_json(LogLevel lvl, const std::string& msg, const std::string&
 void log_json(LogLevel lvl, const std::string& msg, const std::string& fields = "");
 // D37: per-step JSONL metrics logger (train.log.jsonl)
 class MetricsLogger {
-public:
+   public:
     explicit MetricsLogger(const std::string& path);
     void log_step(int step, float loss, float ppl, float lr, float grad_norm, float tokens_sec);
-private:
+
+   private:
     std::string path_;
 };
-}
+}  // namespace llm

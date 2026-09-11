@@ -1,8 +1,10 @@
 #include "llm/dataset.h"
-#include "llm/tokenizer.h"
+
 #include <algorithm>
 #include <fstream>
 #include <random>
+
+#include "llm/tokenizer.h"
 #ifdef __linux__
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -36,24 +38,28 @@ static std::string read_file_bytes(const std::string& path, bool use_mmap) {
     std::ifstream in(path, std::ios::binary);
     return std::string((std::istreambuf_iterator<char>(in)), {});
 }
-Dataset::Dataset(const std::string& path, size_t block_size, bool use_mmap): block_size_(block_size){
+Dataset::Dataset(const std::string& path, size_t block_size, bool use_mmap)
+    : block_size_(block_size) {
     std::string text = read_file_bytes(path, use_mmap);
-    if(text.empty()){
+    if (text.empty()) {
         // try generate tiny shakespeare stub, still use tokenizer
-        text="To be, or not to be, that is the question.\n";
-        for(int i=0;i<10;++i) text+=text;
+        text = "To be, or not to be, that is the question.\n";
+        for (int i = 0; i < 10; ++i) text += text;
     }
     Tokenizer tok;
-    tokens_=tok.encode(text);
-    if(tokens_.empty()) tokens_.assign(256,0);
+    tokens_ = tok.encode(text);
+    if (tokens_.empty()) tokens_.assign(256, 0);
 }
 std::vector<int> Dataset::get_batch(size_t idx, size_t batch_size) const {
     std::vector<int> batch;
-    for(size_t i=0;i<batch_size && idx+i<tokens_.size(); ++i) batch.push_back(tokens_[idx+i]);
+    for (size_t i = 0; i < batch_size && idx + i < tokens_.size(); ++i)
+        batch.push_back(tokens_[idx + i]);
     return batch;
 }
 DataLoader::DataLoader(const Dataset& ds, size_t batch_size, bool shuffle, uint64_t seed)
-    : ds_(ds), batch_size_(batch_size), shuffle_(shuffle), seed_(seed) { build_order(); }
+    : ds_(ds), batch_size_(batch_size), shuffle_(shuffle), seed_(seed) {
+    build_order();
+}
 void DataLoader::build_order() {
     order_.clear();
     for (size_t s = 0; s < ds_.size(); s += batch_size_) order_.push_back(s);
@@ -62,15 +68,20 @@ void DataLoader::build_order() {
         std::shuffle(order_.begin(), order_.end(), rng);
     }
 }
-std::vector<std::vector<int>> DataLoader::next_batch(){
+std::vector<std::vector<int>> DataLoader::next_batch() {
     std::vector<std::vector<int>> b;
-    if(cursor_ >= order_.size()) return b;
+    if (cursor_ >= order_.size()) return b;
     b.push_back(ds_.get_batch(order_[cursor_], batch_size_));
     cursor_++;
     return b;
 }
-bool DataLoader::has_next() const { return cursor_ < order_.size(); }
-void DataLoader::reset(){ cursor_=0; if (shuffle_) build_order(); }
+bool DataLoader::has_next() const {
+    return cursor_ < order_.size();
+}
+void DataLoader::reset() {
+    cursor_ = 0;
+    if (shuffle_) build_order();
+}
 
 // ── B16 ──
 PackedBatch pack_with_eos(const std::vector<int>& tokens, size_t block_size, int eos_id) {
@@ -79,7 +90,10 @@ PackedBatch pack_with_eos(const std::vector<int>& tokens, size_t block_size, int
     auto flush = [&]() {
         std::vector<int> row(block_size, eos_id), m(block_size, 0);
         size_t n = std::min(cur.size(), block_size);
-        for (size_t i = 0; i < n; ++i) { row[i] = cur[i]; m[i] = 1; }
+        for (size_t i = 0; i < n; ++i) {
+            row[i] = cur[i];
+            m[i] = 1;
+        }
         out.input.push_back(std::move(row));
         out.mask.push_back(std::move(m));
         cur.clear();
@@ -101,4 +115,4 @@ void train_val_split(const std::vector<int>& tokens, double train_ratio, uint64_
     train_out.assign(tokens.begin(), tokens.begin() + n_train);
     val_out.assign(tokens.begin() + n_train, tokens.end());
 }
-}
+}  // namespace llm

@@ -26,7 +26,7 @@ enum class DType { F32, I8 };
 
 class Tensor {
    public:
-    FloatVec data;  // I90: 64B-aligned storage
+    FloatVec data;          // I90: 64B-aligned storage
     mutable FloatVec grad;  // for autograd (mutable so const backward can accumulate)
     std::vector<size_t> shape;
     std::vector<size_t> strides;
@@ -84,10 +84,12 @@ class Tensor {
         return Tensor(shape, 1.0f);
     }
     // ── F51 int8 helpers ──
-    bool is_int8() const { return dtype == DType::I8; }
+    bool is_int8() const {
+        return dtype == DType::I8;
+    }
     void require_f32(const char* op) const;  // throws std::runtime_error on I8
-    void quantize_to_int8();                  // F32 -> I8 in place (per-tensor scale)
-    Tensor dequantized() const;               // I8 -> F32 copy (throws if already F32? no: returns *this)
+    void quantize_to_int8();                 // F32 -> I8 in place (per-tensor scale)
+    Tensor dequantized() const;  // I8 -> F32 copy (throws if already F32? no: returns *this)
     void print(const std::string& name = "") const;
     std::vector<size_t> get_shape() const {
         return shape;

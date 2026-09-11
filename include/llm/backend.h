@@ -7,4 +7,4 @@ enum class Backend { CPU, CUDA };
 Backend active_backend();
 const char* backend_name();
 bool cuda_available();
-} // namespace llm
+}  // namespace llm

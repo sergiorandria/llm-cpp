@@ -1,11 +1,16 @@
-#include "llm/gptq.h"
-#include "llm/model.h"
 #include <cassert>
 #include <cmath>
 #include <iostream>
+
+#include "llm/gptq.h"
+#include "llm/model.h"
 int main() {
     llm::Config cfg;
-    cfg.vocab_size = 16; cfg.n_layers = 1; cfg.n_heads = 2; cfg.n_embd = 8; cfg.block_size = 8;
+    cfg.vocab_size = 16;
+    cfg.n_layers = 1;
+    cfg.n_heads = 2;
+    cfg.n_embd = 8;
+    cfg.block_size = 8;
     llm::GPT m(cfg);
     // F52: quantize -> save -> load -> dequant with LOADED scales, err < 0.5
     auto entries = llm::quantize_model_4bit(m, 32);
@@ -14,7 +19,8 @@ int main() {
     auto loaded = llm::load_gptq("/tmp/q.gptq");
     assert(loaded.size() == entries.size());
     auto params = m.parameters();
-    auto named0 = entries;  // originals carry names; compare against live params by order of 2D params
+    auto named0 =
+        entries;  // originals carry names; compare against live params by order of 2D params
     size_t k = 0;
     float max_err = 0;
     for (auto* p : params) {
@@ -31,7 +37,8 @@ int main() {
     assert(max_err < 0.5f);
     // F53: AWQ protects salient channels — quant error on salient rows < naive
     llm::Tensor W({8, 8}, 0.0f);
-    for (size_t i = 0; i < 8; ++i) for (size_t j = 0; j < 8; ++j) W(i, j) = (float)(i * 8 + j) * 0.01f;
+    for (size_t i = 0; i < 8; ++i)
+        for (size_t j = 0; j < 8; ++j) W(i, j) = (float)(i * 8 + j) * 0.01f;
     llm::Tensor acts({16, 8}, 0.1f);
     for (size_t t = 0; t < 16; ++t) acts(t, 0) = 10.0f;  // channel 0 salient
     auto mag = llm::channel_act_mag(acts);
@@ -39,8 +46,9 @@ int main() {
     auto [scaled, inv] = llm::awq_rescale_for_quant(W, mag, 0.5f);
     // exactness in fp: scaled*inv == orig
     float md = 0;
-    for (size_t i = 0; i < 8; ++i) for (size_t j = 0; j < 8; ++j)
-        md = std::max(md, std::fabs(scaled(i, j) * inv.data[i] - W(i, j)));
+    for (size_t i = 0; i < 8; ++i)
+        for (size_t j = 0; j < 8; ++j)
+            md = std::max(md, std::fabs(scaled(i, j) * inv.data[i] - W(i, j)));
     assert(md < 1e-5);
     // salient row amplified
     assert(std::fabs(scaled(0, 0)) > std::fabs(W(0, 0)));

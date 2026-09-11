@@ -1,52 +1,79 @@
 #pragma once
-#include "tensor.h"
 #include <istream>
 #include <ostream>
 #include <vector>
+
+#include "tensor.h"
 namespace llm {
 class Optimizer {
-public:
-    virtual ~Optimizer()=default;
-    virtual void step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads)=0;
-    virtual void zero_grad()=0;
-    virtual void set_lr(float lr) {(void)lr;}
-    virtual float get_lr() const { return 0.0f; }
+   public:
+    virtual ~Optimizer() = default;
+    virtual void step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads) = 0;
+    virtual void zero_grad() = 0;
+    virtual void set_lr(float lr) {
+        (void)lr;
+    }
+    virtual float get_lr() const {
+        return 0.0f;
+    }
     // D31: training-state persistence (default no-op for SGD-style without state)
-    virtual void save_state(std::ostream& os) const {(void)os;}
-    virtual void load_state(std::istream& is) {(void)is;}
+    virtual void save_state(std::ostream& os) const {
+        (void)os;
+    }
+    virtual void load_state(std::istream& is) {
+        (void)is;
+    }
 };
 class SGD : public Optimizer {
-public:
-    explicit SGD(float lr=0.01f): lr_(lr){}
+   public:
+    explicit SGD(float lr = 0.01f) : lr_(lr) {}
     void step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads) override;
     void zero_grad() override {}
-    void set_lr(float lr) override { lr_ = lr; }
-    float get_lr() const override { return lr_; }
-private: float lr_;
+    void set_lr(float lr) override {
+        lr_ = lr;
+    }
+    float get_lr() const override {
+        return lr_;
+    }
+
+   private:
+    float lr_;
 };
 class Adam : public Optimizer {
-public:
-    Adam(float lr=1e-3f, float b1=0.9f, float b2=0.999f, float eps=1e-8f);
+   public:
+    Adam(float lr = 1e-3f, float b1 = 0.9f, float b2 = 0.999f, float eps = 1e-8f);
     void step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads) override;
     void zero_grad() override {}
-    void set_lr(float lr) override { lr_ = lr; }
-    float get_lr() const override { return lr_; }
+    void set_lr(float lr) override {
+        lr_ = lr;
+    }
+    float get_lr() const override {
+        return lr_;
+    }
     void save_state(std::ostream& os) const override;
     void load_state(std::istream& is) override;
-protected:
-    float lr_, b1_, b2_, eps_; int t_=0;
+
+   protected:
+    float lr_, b1_, b2_, eps_;
+    int t_ = 0;
     std::vector<Tensor> m_, v_;
 };
 class AdamW : public Adam {
-public:
-    AdamW(float lr=1e-3f, float b1=0.9f, float b2=0.999f, float eps=1e-8f, float wd=0.01f);
+   public:
+    AdamW(float lr = 1e-3f, float b1 = 0.9f, float b2 = 0.999f, float eps = 1e-8f,
+          float wd = 0.01f);
     void step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads) override;
-    // Explicit per-param decay flags (true = apply wd). Size must match params or empty = auto (2D only).
+    // Explicit per-param decay flags (true = apply wd). Size must match params or empty = auto (2D
+    // only).
     void step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads,
               const std::vector<char>& decay);
-    static bool default_decay(const Tensor& p) { return p.shape.size() > 1; }
-private: float wd_;
+    static bool default_decay(const Tensor& p) {
+        return p.shape.size() > 1;
+    }
+
+   private:
+    float wd_;
 };
 // A05: shared global-norm clipping. Scales grads in place; returns pre-clip total norm.
 float clip_by_global_norm(std::vector<Tensor>& grads, float max_norm);
-}
+}  // namespace llm

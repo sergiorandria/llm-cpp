@@ -1,9 +1,10 @@
-#include "llm/sampling.h"
-#include "llm/tensor.h"
-#include "llm/utils.h"
 #include <cassert>
 #include <iostream>
 #include <random>
+
+#include "llm/sampling.h"
+#include "llm/tensor.h"
+#include "llm/utils.h"
 int main() {
     std::vector<float> logits = {1.0f, 2.0f, 3.0f, 0.5f, -1.0f, 0.0f, 1.5f, 2.5f};
     // Seeded sampling deterministic
