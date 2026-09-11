@@ -109,4 +109,6 @@
 - F59 Gate: `test_quant_gate` calib ppl rel 8e-6<5%, 4-bit err 0.002<0.5 + `.github/workflows/quant.yml`.
 - F60 CLI: `generate/train --quantize --bits 4|8 --group 128 --out` with mean_abs_delta verify. Track F complete (10/10).
 - G61/G62/G65/G70 Server: POSIX no-dep OpenAI-compatible `Server` (`server.h/cpp`: /healthz, /v1/completions, /v1/chat/completions, SSE stream, 429 gate, SIGPIPE-proof), `test_server` loopback green (also fixed 3rd assert-elided-syscall trap: connect() hoisted).
+- G66 CLI: `serve --port/--max_concurrency` (SIGTERM/SIGINT drain) + `generate --stream/--stop/--logprobs/--seed/--json` (stream uses UTF-8 incremental decode), live curl verified.
+- G67 Schema: `config/schema.json` + `validate_config_verbose` messages wired into train/generate/serve, `test_config_errors` 5 bad configs.
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.

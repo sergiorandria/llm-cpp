@@ -21,12 +21,18 @@ void save_config(const Config& cfg, const std::string& path){
     out<<"{\n  \"vocab_size\": "<<cfg.vocab_size<<",\n  \"n_layers\": "<<cfg.n_layers<<",\n  \"n_heads\": "<<cfg.n_heads<<",\n  \"n_embd\": "<<cfg.n_embd<<",\n  \"block_size\": "<<cfg.block_size<<"\n}\n";
 }
 bool validate_config(const Config& cfg){
-    if(cfg.n_embd % cfg.n_heads !=0) return false;
-    if(cfg.vocab_size==0 || cfg.n_layers==0) return false;
+    std::string err;
+    return validate_config_verbose(cfg, err);
+}
+bool validate_config_verbose(const Config& cfg, std::string& err){
+    if(cfg.n_embd % cfg.n_heads !=0) { err = "n_heads (" + std::to_string(cfg.n_heads) + ") must divide n_embd (" + std::to_string(cfg.n_embd) + ")"; return false; }
+    if(cfg.vocab_size==0) { err = "vocab_size must be > 0"; return false; }
+    if(cfg.n_layers==0) { err = "n_layers must be > 0"; return false; }
     // C24: ALiBi and RoPE are mutually exclusive position encodings
-    if(cfg.use_alibi && cfg.pos_encoding == PosEncoding::RoPE) return false;
-    if(cfg.rope_scaling < 1.0f) return false;
-    if(cfg.global_every == 0) return false;
+    if(cfg.use_alibi && cfg.pos_encoding == PosEncoding::RoPE) { err = "use_alibi and RoPE are mutually exclusive (pick one position encoding)"; return false; }
+    if(cfg.rope_scaling < 1.0f) { err = "rope_scaling must be >= 1.0"; return false; }
+    if(cfg.global_every == 0) { err = "global_every must be > 0"; return false; }
+    err.clear();
     return true;
 }
 Config load_hf_config(const std::string& path){

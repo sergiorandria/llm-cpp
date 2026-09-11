@@ -196,9 +196,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   Image <500MB, `./llm-cpp --help` works. CI builds + pushes on tag.
 - [x] **G65 Compose + healthcheck** — `docker-compose.yml`, `GET /healthz → {status, version, params}`.
   Test: `docker compose up -d && curl /healthz` in CI.
-- [ ] **G66 Generate CLI flags** — `src/main.cpp:generate --stream --stop --logprobs --seed --json`.
+- [x] **G66 Generate CLI flags** — `src/main.cpp:generate --stream --stop --logprobs --seed --json`.
   `--json` emits `{text, tokens, logprobs, latency_ms}`. Test each flag smoke.
-- [ ] **G67 Config JSON schema** — `config/schema.json` + `validate_config` error strings
+- [x] **G67 Config JSON schema** — `config/schema.json` + `validate_config` error strings
   (`"n_heads must divide n_embd"` not just `invalid config`). Test: 5 bad configs → 5 messages.
 - [ ] **G68 Model card generator** — `scripts/model_card.py --checkpoint → MODEL_CARD.md`
   (params, arch, ppl, quant, license). Test: golden file on tiny checkpoint.

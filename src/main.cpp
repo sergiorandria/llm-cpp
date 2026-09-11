@@ -9,9 +9,15 @@
 #include "llm/scheduler.h"
 #include "llm/quantize.h"
 #include "llm/gptq.h"
+#include "llm/server.h"
+#include "llm/utils.h"
+#include <atomic>
+#include <chrono>
 #include <cmath>
+#include <csignal>
 #include <iostream>
 #include <string>
+#include <thread>
 
 // F60: --bits {4,8} --group N --out path. Applies in-place simulated quantization
 // (8-bit: int8 levels; 4-bit: GPTQ group levels, dequantized back to fp weights)
@@ -44,9 +50,10 @@ static void apply_quantize_flags(llm::GPT& model, int bits, size_t group) {
 
 void print_usage(const char* prog) {
     std::cout << "llm-cpp v" << LLM_CPP_VERSION << "\n";
-    std::cout << "Usage: " << prog << " [train|generate] [options]\n"
+    std::cout << "Usage: " << prog << " [train|generate|serve] [options]\n"
               << "  train    --config <path> --data <path> [--checkpoint <path>] [--quantize] [--bits 4|8] [--group 128] [--out <quant.bin>]\n"
-              << "  generate --prompt <text> [--max_tokens 100] [--config <path>] [--checkpoint <path>] [--temperature 1.0] [--top_k 0] [--top_p 1.0] [--quantize] [--bits 4|8] [--group 128] [--out <quant.bin>]\n"
+              << "  generate --prompt <text> [--max_tokens 100] [--config <path>] [--checkpoint <path>] [--temperature 1.0] [--top_k 0] [--top_p 1.0] [--quantize] [--bits 4|8] [--group 128] [--out <quant.bin>] [--stream] [--stop a,b] [--logprobs] [--seed N] [--json]\n"
+              << "  serve    --port 8080 [--config <path>] [--checkpoint <path>] [--max_concurrency 8]\n"
               << "  --help   Show this help\n";
 }
 
@@ -82,7 +89,7 @@ int main(int argc, char* argv[]) {
     std::string cfg_path = args.get("config", "config/config.json.example");
     std::string data_path = args.get("data", "data/input.txt");
     llm::Config cfg = llm::load_config(cfg_path);
-    if(!llm::validate_config(cfg)) { std::cerr<<"[train] invalid config\n"; return 1; }
+    { std::string verr; if(!llm::validate_config_verbose(cfg, verr)) { std::cerr<<"[train] invalid config: "<<verr<<"\n"; return 1; } }
     std::cout << "[train] config "<<cfg_path<<" data "<<data_path<<" n_layers="<<cfg.n_layers<<"\n";
     llm::GPT model(cfg);
     std::cout<<"[train] model params "<<model.num_parameters()<<"\n";
@@ -135,7 +142,7 @@ int main(int argc, char* argv[]) {
     llm::Config cfg;
     if (!cfg_path.empty()) {
         cfg = llm::load_config(cfg_path);
-        if(!llm::validate_config(cfg)) { std::cerr<<"[generate] invalid config "<<cfg_path<<"\n"; return 1; }
+        { std::string verr; if(!llm::validate_config_verbose(cfg, verr)) { std::cerr<<"[generate] invalid config "<<cfg_path<<": "<<verr<<"\n"; return 1; } }
         std::cout<<"[generate] config "<<cfg_path<<"\n";
     } else {
         cfg.vocab_size=256; cfg.n_layers=2; cfg.n_heads=4; cfg.n_embd=64; cfg.block_size=128;
@@ -156,8 +163,104 @@ int main(int argc, char* argv[]) {
     }
     llm::Tokenizer tok(256);
     auto ids = tok.encode(prompt);
+    // G66: --seed for reproducible sampling
+    if (args.has("seed")) llm::set_global_seed((uint64_t)std::stoul(args.get("seed", "42")));
+    // G66: --stop comma-separated strings -> truncate text at first occurrence
+    std::vector<std::string> stops;
+    if (args.has("stop")) {
+        std::string s = args.get("stop", "");
+        size_t p = 0;
+        while (p <= s.size()) {
+            size_t c = s.find(',', p);
+            if (c == std::string::npos) c = s.size();
+            if (c > p) stops.push_back(s.substr(p, c - p));
+            p = c + 1;
+        }
+    }
+    auto apply_stops = [&](std::string t) {
+        for (auto& st : stops) {
+            size_t f = t.find(st);
+            if (f != std::string::npos) t.resize(f);
+        }
+        return t;
+    };
+    if (args.has("json") || args.has("logprobs")) {
+        auto t0 = std::chrono::steady_clock::now();
+        auto go = model.generate_with_logprobs(ids, max_tokens, temp, top_k, top_p);
+        auto t1 = std::chrono::steady_clock::now();
+        double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+        std::string text = apply_stops(tok.decode(std::vector<int>(go.tokens.begin() + ids.size(), go.tokens.end())));
+        if (args.has("json")) {
+            std::cout << "{\"text\":\"";
+            for (char c : text) {
+                if (c == '"') std::cout << "\\\"";
+                else if (c == '\\') std::cout << "\\\\";
+                else if (c == '\n') std::cout << "\\n";
+                else std::cout << c;
+            }
+            std::cout << "\",\"tokens\":[";
+            for (size_t i = ids.size(); i < go.tokens.size(); ++i) {
+                if (i > ids.size()) std::cout << ",";
+                std::cout << go.tokens[i];
+            }
+            std::cout << "],\"logprobs\":[";
+            for (size_t i = 0; i < go.logprobs.size(); ++i) {
+                if (i) std::cout << ",";
+                std::cout << go.logprobs[i];
+            }
+            std::cout << "],\"latency_ms\":" << ms << "}\n";
+        } else {
+            std::cout << text << "\n";
+            std::cerr << "[generate] latency_ms=" << ms << " logprobs=" << go.logprobs.size() << "\n";
+        }
+        return 0;
+    }
+    if (args.has("stream")) {
+        // G66: true per-token streaming with UTF-8-safe incremental decode
+        std::string carry;
+        model.generate_streaming(ids, max_tokens, [&](int t) {
+            std::string chunk = tok.decode_incremental({t}, carry);
+            std::cout << chunk << std::flush;
+        });
+        if (!carry.empty()) std::cout << carry;
+        std::cout << "\n";
+        return 0;
+    }
     auto out = model.generate(ids, max_tokens, temp, top_k, top_p, rep);
-    std::cout << tok.decode(out) << "\n";
+    std::cout << apply_stops(tok.decode(out)) << "\n";
+    return 0;
+    } else if (cmd == "serve") {
+    // G61/G70: OpenAI-compatible server with graceful shutdown
+    auto args = llm::parse_args(argc, argv);
+    int port = std::stoi(args.get("port", "8080"));
+    std::string cfg_path = args.get("config", "");
+    std::string ckpt = args.get("checkpoint", "");
+    llm::Config cfg;
+    if (!cfg_path.empty()) {
+        cfg = llm::load_config(cfg_path);
+        std::string err;
+        if (!llm::validate_config_verbose(cfg, err)) { std::cerr << "[serve] invalid config: " << err << "\n"; return 1; }
+    } else {
+        cfg.vocab_size=256; cfg.n_layers=2; cfg.n_heads=4; cfg.n_embd=64; cfg.block_size=128;
+    }
+    llm::GPT model(cfg);
+    if (!ckpt.empty()) model.load(ckpt);
+    llm::Tokenizer tok(256);
+    llm::ServerConfig scfg;
+    scfg.port = port;
+    scfg.max_concurrency = std::stoul(args.get("max_concurrency", "8"));
+    llm::Server srv(model, tok, scfg);
+    if (!srv.start()) { std::cerr << "[serve] bind failed on port " << port << "\n"; return 1; }
+    std::cout << "[serve] listening on 127.0.0.1:" << srv.port() << " (max_concurrency=" << scfg.max_concurrency << ")\n";
+    static std::atomic<bool> g_run{true};
+    static llm::Server* g_srv = nullptr;
+    g_srv = &srv;
+    std::signal(SIGTERM, [](int){ g_run = false; if (g_srv) g_srv->stop(); });
+    std::signal(SIGINT, [](int){ g_run = false; if (g_srv) g_srv->stop(); });
+    // G70: block until signal; handler drains in-flight via stop()
+    while (g_run.load()) std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    srv.stop();
+    std::cout << "[serve] drained, bye\n";
     return 0;
     }
 
