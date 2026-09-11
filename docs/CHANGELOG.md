@@ -85,3 +85,6 @@
 - D32 SafeTensors: F32 JSON-header + LE data (`checkpoint.h/cpp`), `gpt_named_params`, `test_safetensors` logits <1e-6.
 - D33 HF config: `load_hf_config` maps n_layer/n_head/n_embd/n_positions/n_vocab, `test_hf_sched` GPT-2 124M.
 - D34 Scheduler: `CosineScheduler(lr, warmup, total, min_lr, cycles)` warmup+floor+restarts, `test_hf_sched` peaks/valleys.
+- D35 Accum: `Trainer::train_step_accum` sums K micro-grads, steps every K, `test_accum_logger` no-step-before-K.
+- D36 Reduce: `mean_reduce_grads` allreduce-mean helper, `test_accum_logger` average + identity.
+- D37 Logger: `MetricsLogger::log_step` JSONL {step,loss,ppl,lr,grad_norm,tokens_sec}, 3-line test.

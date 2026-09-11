@@ -120,12 +120,12 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   `load_hf_config(dir)` maps `n_layer/n_head/n_embd` → our `Config`. Test on GPT-2 124M shape.
 - [x] **D34 Scheduler warmup+cosine+restarts** — `src/scheduler.cpp`.
   `CosineScheduler{warmup_steps, total_steps, min_lr, restarts}`. Test: lr curve matches formula.
-- [ ] **D35 Gradient accumulation** — `src/trainer.cpp:TrainConfig{grad_accum_steps=4}`.
+- [x] **D35 Gradient accumulation** — `src/trainer.cpp:TrainConfig{grad_accum_steps=4}`.
   Accumulate `grad` over K micro-batches before `optimizer.step()`.
   Test: accum=4 × batch=1 ≡ batch=4 within 1e-4.
-- [ ] **D36 Single-node data-parallel** — `src/trainer.cpp` (threads, not MPI).
+- [x] **D36 Single-node data-parallel** — `src/trainer.cpp` (threads, not MPI).
   Shard batch across `num_threads`, allreduce grads by mean. Test: 2-thread ≡ 1-thread <1e-4.
-- [ ] **D37 JSONL metrics logger** — `src/logging.cpp` (exists, extend).
+- [x] **D37 JSONL metrics logger** — `src/logging.cpp` (exists, extend).
   `train.log.jsonl` per-step `{step, loss, ppl, lr, grad_norm, tokens_sec}`.
   Test: 3-step run emits 3 parseable lines.
 - [ ] **D38 Best-checkpoint keeper** — `src/trainer.cpp:TrainConfig{keep_best_n=3, eval_every=100}`.

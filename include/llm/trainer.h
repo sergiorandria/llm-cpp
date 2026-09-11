@@ -20,11 +20,17 @@ struct TrainConfig {
     bool deterministic=false; // A08: single-thread + fixed seeds when true
 };
 bool has_nonfinite(const std::vector<Tensor>& grads); // A07 helper
+// D36: average per-shard grads (single-node allreduce mean). All entries must share shapes.
+void mean_reduce_grads(const std::vector<std::vector<Tensor>>& shard_grads,
+                       std::vector<Tensor>& out);
 class Trainer {
 public:
     Trainer(GPT& model, const TrainConfig& cfg, Optimizer& optim, LRScheduler& sched);
     void train(Dataset& train_ds, Dataset* val_ds=nullptr);
     float train_step(const std::vector<int>& batch);
+    // D35: accumulate grads over grad_accum_steps micro-batches before stepping.
+    // Returns mean loss; steps optimizer only every K calls (K=cfg.grad_accum_steps).
+    float train_step_accum(const std::vector<int>& micro_batch);
     float evaluate(Dataset& ds);
     void save_checkpoint(const std::string& path);
     // D31: full training-state save/load (model weights + optimizer + step/rng).
@@ -34,6 +40,9 @@ public:
     int skipped_steps() const { return skipped_; }
     int step() const { return step_; }
     void set_step(int s) { step_ = s; }
+    // D37: last per-step metrics (JSONL logger reads these)
+    float last_loss() const { return last_loss_; }
+    float last_grad_norm() const { return last_grad_norm_; }
 private:
     GPT& model_;
     TrainConfig cfg_;
@@ -41,6 +50,11 @@ private:
     LRScheduler& sched_;
     int step_=0;
     int skipped_=0; // A07: optimizer steps skipped due to non-finite grads
+    // D35 accumulation buffer (sum of micro-batch grads) + counter
+    std::vector<Tensor> accum_;
+    size_t accum_count_ = 0;
+    float last_loss_ = 0.0f;
+    float last_grad_norm_ = 0.0f;
     void clip_grads(std::vector<Tensor>& grads);
 };
 }

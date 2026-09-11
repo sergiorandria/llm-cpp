@@ -108,11 +108,65 @@ float Trainer::train_step(const std::vector<int>& batch) {
         return loss;
     }
     clip_grads(grads);
+    // D37 metrics
+    last_loss_ = loss;
+    double n2 = 0;
+    for (auto& g : grads) for (float v : g.data) n2 += (double)v * v;
+    last_grad_norm_ = (float)std::sqrt(n2);
     float lr = sched_.get_lr(step_);
     optim_.set_lr(lr);
     optim_.step(params, grads);
     model_.tie_weights();
     return loss;
+}
+
+// D35 accumulation: sum micro grads, step every K. Loss returned is micro mean.
+float Trainer::train_step_accum(const std::vector<int>& micro_batch) {
+    size_t K = cfg_.grad_accum_steps < 1 ? 1 : cfg_.grad_accum_steps;
+    auto [logits, hidden] = model_.forward_with_hidden(micro_batch);
+    float loss = compute_loss(logits, micro_batch);
+    model_.zero_grad();
+    Tensor dlogits = cross_entropy_backward(logits, micro_batch, cfg_.label_smoothing);
+    model_.backward(dlogits, micro_batch, hidden);
+    auto params = model_.parameters();
+    if (accum_.empty()) {
+        accum_.reserve(params.size());
+        for (auto* p : params) accum_.emplace_back(p->shape, 0.0f);
+    }
+    for (size_t i = 0; i < params.size(); ++i) {
+        auto* p = params[i];
+        if (p->grad.size() != p->data.size()) continue;
+        for (size_t j = 0; j < p->data.size(); ++j) accum_[i].data[j] += p->grad[j];
+    }
+    accum_count_++;
+    last_loss_ = loss;
+    if (accum_count_ < K) return loss;
+    // average, then clip/step like train_step
+    std::vector<Tensor> grads = accum_;
+    for (auto& g : grads) for (auto& v : g.data) v /= (float)K;
+    if (has_nonfinite(grads)) { ++skipped_; accum_count_ = 0; for (auto& a : accum_) a.fill(0); return loss; }
+    clip_grads(grads);
+    double n2 = 0;
+    for (auto& g : grads) for (float v : g.data) n2 += (double)v * v;
+    last_grad_norm_ = (float)std::sqrt(n2);
+    float lr = sched_.get_lr(step_);
+    optim_.set_lr(lr);
+    optim_.step(params, grads);
+    model_.tie_weights();
+    accum_count_ = 0;
+    for (auto& a : accum_) a.fill(0);
+    return loss;
+}
+
+void mean_reduce_grads(const std::vector<std::vector<Tensor>>& shard_grads,
+                       std::vector<Tensor>& out) {
+    if (shard_grads.empty()) return;
+    out = shard_grads[0];
+    for (size_t s = 1; s < shard_grads.size(); ++s)
+        for (size_t i = 0; i < out.size(); ++i)
+            for (size_t j = 0; j < out[i].data.size(); ++j) out[i].data[j] += shard_grads[s][i].data[j];
+    float inv = 1.0f / (float)shard_grads.size();
+    for (auto& g : out) for (auto& v : g.data) v *= inv;
 }
 float Trainer::evaluate(Dataset& ds) {
     auto tokens = ds.tokens();

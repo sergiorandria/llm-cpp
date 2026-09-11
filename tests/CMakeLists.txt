@@ -122,3 +122,5 @@ add_executable(test_safetensors test_safetensors.cpp ../src/checkpoint.cpp ../sr
 add_test(NAME safetensors COMMAND test_safetensors)
 add_executable(test_hf_sched test_hf_sched.cpp ../src/config.cpp ../src/scheduler.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp)
 add_test(NAME hf_sched COMMAND test_hf_sched)
+add_executable(test_accum_logger test_accum_logger.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/trainer.cpp ../src/dataset.cpp ../src/optimizer.cpp ../src/scheduler.cpp ../src/loss.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp ../src/logging.cpp)
+add_test(NAME accum_logger COMMAND test_accum_logger)
