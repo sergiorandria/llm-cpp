@@ -65,15 +65,15 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 - [x] **B14 GPT-2 pre-tokenizer regex** — `src/tokenizer.cpp`.
   Add `split_pretokenize(text)` (`'s|'t|'re| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+`).
   Test `test_bpe_correctness.cpp` extension: `"Hello, world!"` splits as GPT-2.
-- [ ] **B15 Memmap dataset for large corpora** — `src/dataset.cpp`.
+- [x] **B15 Memmap dataset for large corpora** — `src/dataset.cpp`.
   `Dataset(path, block_size, mmap=true)` pages `data/*.bin` without full RAM load.
   Test: 100MB synthetic file loads with RSS <50MB (check `/proc/self/statm` in test).
-- [ ] **B16 Packing + EOS + masks** — `src/dataset.cpp`, `src/trainer.cpp`.
+- [x] **B16 Packing + EOS + masks** — `src/dataset.cpp`, `src/trainer.cpp`.
   Pack short docs with `<|endoftext|>` to `block_size`, emit `attention_mask`.
   Test: packed batch loss equals concatenated per-doc loss.
-- [ ] **B17 Multi-thread DataLoader** — `src/dataset.cpp` (+ reuse `PrefetchLoader` pattern).
+- [x] **B17 Multi-thread DataLoader** — `src/dataset.cpp` (+ reuse `PrefetchLoader` pattern).
   `DataLoader{num_workers=2}` background tokenization. Test: shuffled epoch covers all tokens once.
-- [ ] **B18 Train/val split + eval hook** — `src/dataset.cpp:train_val_split(0.99)`, `src/trainer.cpp`.
+- [x] **B18 Train/val split + eval hook** — `src/dataset.cpp:train_val_split(0.99)`, `src/trainer.cpp`.
   `Trainer::evaluate(val_ds)` returns ppl. Test: overfit tiny set → train ppl < val ppl initially.
 - [ ] **B19 Data downloader + checksum** — `scripts/download_data.py` (new), `data/README.md`.
   Fetch TinyStories/Shakespeare with SHA256 verify. Test (CTest `download_smoke`): `--dry-run` passes offline.

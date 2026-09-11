@@ -65,3 +65,7 @@
 - B12 HF compat: `load_hf/save_hf` (vocab.json + merges.txt #version: 0.2), `test_hf_compat` merge-order + encode equivalence.
 - B13 Streaming: `decode_incremental(ids, carry)` holds back incomplete UTF-8 tail, `test_streaming` split-emoji concat == full.
 - B14 Pre-tokenizer: `split_pretokenize` GPT-2 contractions/space-letters/numbers/punct, `test_pretok`.
+- B15 Mmap: `read_file_bytes` mmap path (`dataset.cpp`), `Dataset(path, block, use_mmap)`, 1MB equivalence.
+- B16 Packing: `pack_with_eos(tokens, block, eos)` + masks, `test_data_pipeline`.
+- B17 Shuffle: `DataLoader(ds, batch, shuffle, seed)` Fisher-Yates block order, same-seed identical, full coverage.
+- B18 Split: `train_val_split(tokens, ratio, seed)`, 900/100 contiguous.
