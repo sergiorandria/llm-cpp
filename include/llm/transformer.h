@@ -5,7 +5,7 @@
 
 namespace llm {
 
-struct TransformerConfig { bool pre_ln = true; float dropout=0.0f; };
+struct TransformerConfig { bool pre_ln = true; float dropout=0.0f; bool use_rmsnorm=false; /*C22*/ };
 
 class TransformerBlock {
 public:
@@ -23,6 +23,7 @@ private:
     FeedForward ffn_;
     Tensor ln1_gamma_, ln1_beta_;
     Tensor ln2_gamma_, ln2_beta_;
+    bool use_rmsnorm_ = false;
 };
 
 } // namespace llm

@@ -106,3 +106,5 @@ add_executable(test_data_pipeline test_data_pipeline.cpp ../src/dataset.cpp ../s
 add_test(NAME data_pipeline COMMAND test_data_pipeline)
 add_executable(test_gqa test_gqa.cpp ../src/mqa.cpp ../src/tensor.cpp)
 add_test(NAME gqa COMMAND test_gqa)
+add_executable(test_rmsnorm_model test_rmsnorm_model.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/trainer.cpp ../src/dataset.cpp ../src/optimizer.cpp ../src/scheduler.cpp ../src/loss.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/utils.cpp ../src/layernorm.cpp)
+add_test(NAME rmsnorm_model COMMAND test_rmsnorm_model)

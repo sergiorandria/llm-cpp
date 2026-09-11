@@ -36,7 +36,9 @@ GPT::GPT(const Config& config)
     }
     blocks_.reserve(config.n_layers);
     for (size_t i = 0; i < config.n_layers; ++i) {
-        blocks_.emplace_back(config.n_embd, config.n_heads, config.block_size);
+        TransformerConfig bcfg;
+        bcfg.use_rmsnorm = config.use_rmsnorm; // C22
+        blocks_.emplace_back(config.n_embd, config.n_heads, config.block_size, bcfg);
     }
 }
 
@@ -74,7 +76,7 @@ std::pair<Tensor, Tensor> GPT::forward_with_hidden(const std::vector<int>& token
     for (auto& block : blocks_) {
         x = block.forward(x);
     }
-    x = x.layernorm(&ln_f_gamma_, &ln_f_beta_);
+    x = config_.use_rmsnorm ? x.rmsnorm(&ln_f_gamma_) : x.layernorm(&ln_f_gamma_, &ln_f_beta_);
     Tensor logits = x.matmul(lm_head_);  // [T, vocab]
     return {logits, x};
 }
@@ -117,10 +119,17 @@ void GPT::backward(const Tensor& dlogits, const std::vector<int>& tokens, const 
     if (config_.pos_encoding == PosEncoding::RoPE) x = rope(x, T);
     for (auto& blk : blocks_) x = blk.forward(x);
     // x is now pre-ln, hidden is layernorm(x)
-    auto ln_bwd = x.layernorm_backward(dHidden, &ln_f_gamma_);
-    Tensor dX = ln_bwd.grad_x;
-    const_cast<Tensor&>(ln_f_gamma_).add_grad(ln_bwd.grad_gamma);
-    const_cast<Tensor&>(ln_f_beta_).add_grad(ln_bwd.grad_beta);
+    Tensor dX;
+    if (config_.use_rmsnorm) {
+        auto rb = x.rmsnorm_backward(dHidden, &ln_f_gamma_);
+        dX = rb.grad_x;
+        const_cast<Tensor&>(ln_f_gamma_).add_grad(rb.grad_w);
+    } else {
+        auto ln_bwd = x.layernorm_backward(dHidden, &ln_f_gamma_);
+        dX = ln_bwd.grad_x;
+        const_cast<Tensor&>(ln_f_gamma_).add_grad(ln_bwd.grad_gamma);
+        const_cast<Tensor&>(ln_f_beta_).add_grad(ln_bwd.grad_beta);
+    }
     // Backprop through blocks in reverse
     // Need to cache intermediates per block for accurate backward; recompute forward per block
     std::vector<Tensor> block_inputs;
@@ -183,7 +192,7 @@ std::vector<int> GPT::generate(const std::vector<int>& prompt, size_t max_new_to
         for(size_t b=0;b<blocks_.size();++b){
             h = blocks_[b].forward_incremental(h, cache, b, pos);
         }
-        h = h.layernorm(&ln_f_gamma_, &ln_f_beta_);
+        h = config_.use_rmsnorm ? h.rmsnorm(&ln_f_gamma_) : h.layernorm(&ln_f_gamma_, &ln_f_beta_);
         Tensor logits = h.matmul(lm_head_); // [1, vocab]
         std::vector<float> row(config_.vocab_size);
         for(size_t j=0;j<config_.vocab_size;++j) row[j]=logits(0,j);

@@ -24,6 +24,10 @@ struct Config {
     float rope_theta = 10000.0f; // RoPE base, NTK scaling for 8k: 50000
     float rope_scaling = 1.0f; // 1.0 = 1k, 4.0 = 4k, 8.0 = 8k
     bool deterministic = false; // A08: fixed seeds + single-thread when true
+    bool use_rmsnorm = false; // C22: RMSNorm instead of LayerNorm
+    bool use_alibi = false; // C24: ALiBi bias (mutually exclusive with RoPE)
+    size_t sliding_window = 0; // C25: 0 = full attention, else local window
+    size_t global_every = 1; // C25: every Nth layer is global when sliding
 };
 
 class GPT {

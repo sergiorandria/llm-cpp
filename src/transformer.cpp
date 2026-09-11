@@ -191,14 +191,15 @@ TransformerBlock::TransformerBlock(size_t n_embd, size_t n_heads, size_t block_s
       ln1_gamma_({n_embd}, 1.0f),
       ln1_beta_({n_embd}, 0.0f),
       ln2_gamma_({n_embd}, 1.0f),
-      ln2_beta_({n_embd}, 0.0f) {}
+      ln2_beta_({n_embd}, 0.0f),
+      use_rmsnorm_(cfg.use_rmsnorm) {}
 
 Tensor TransformerBlock::forward(const Tensor& x) const {
-    Tensor ln1 = x.layernorm(&ln1_gamma_, &ln1_beta_);
+    Tensor ln1 = use_rmsnorm_ ? x.rmsnorm(&ln1_gamma_) : x.layernorm(&ln1_gamma_, &ln1_beta_);
     Tensor attn_out = attn_.forward(ln1);
     Tensor y(x.shape, 0.0f);
     for (size_t i = 0; i < y.data.size(); ++i) y.data[i] = x.data[i] + attn_out.data[i];
-    Tensor ln2 = y.layernorm(&ln2_gamma_, &ln2_beta_);
+    Tensor ln2 = use_rmsnorm_ ? y.rmsnorm(&ln2_gamma_) : y.layernorm(&ln2_gamma_, &ln2_beta_);
     Tensor ffn_out = ffn_.forward(ln2);
     Tensor out(y.shape, 0.0f);
     for (size_t i = 0; i < out.data.size(); ++i) out.data[i] = y.data[i] + ffn_out.data[i];
@@ -208,11 +209,11 @@ Tensor TransformerBlock::forward(const Tensor& x) const {
 Tensor TransformerBlock::forward_incremental(const Tensor& x, KVCache& cache, size_t layer, size_t pos) const {
     // x: [1, C] single token
     assert(x.shape[0]==1);
-    Tensor ln1 = x.layernorm(&ln1_gamma_, &ln1_beta_);
+    Tensor ln1 = use_rmsnorm_ ? x.rmsnorm(&ln1_gamma_) : x.layernorm(&ln1_gamma_, &ln1_beta_);
     Tensor attn_out = attn_.forward_incremental(ln1, cache, layer, pos);
     Tensor y(x.shape, 0.0f);
     for(size_t i=0;i<y.data.size();++i) y.data[i]=x.data[i]+attn_out.data[i];
-    Tensor ln2 = y.layernorm(&ln2_gamma_, &ln2_beta_);
+    Tensor ln2 = use_rmsnorm_ ? y.rmsnorm(&ln2_gamma_) : y.layernorm(&ln2_gamma_, &ln2_beta_);
     Tensor ffn_out = ffn_.forward(ln2);
     Tensor out(y.shape, 0.0f);
     for(size_t i=0;i<out.data.size();++i) out.data[i]=y.data[i]+ffn_out.data[i];
@@ -220,11 +221,11 @@ Tensor TransformerBlock::forward_incremental(const Tensor& x, KVCache& cache, si
 }
 Tensor TransformerBlock::backward(const Tensor& x, const Tensor& grad_out) const {
     // Recompute forward intermediates for backward
-    Tensor ln1 = x.layernorm(&ln1_gamma_, &ln1_beta_);
+    Tensor ln1 = use_rmsnorm_ ? x.rmsnorm(&ln1_gamma_) : x.layernorm(&ln1_gamma_, &ln1_beta_);
     Tensor attn_out = attn_.forward(ln1);
     Tensor y(x.shape, 0.0f);
     for (size_t i = 0; i < y.data.size(); ++i) y.data[i] = x.data[i] + attn_out.data[i];
-    Tensor ln2 = y.layernorm(&ln2_gamma_, &ln2_beta_);
+    Tensor ln2 = use_rmsnorm_ ? y.rmsnorm(&ln2_gamma_) : y.layernorm(&ln2_gamma_, &ln2_beta_);
     Tensor ffn_out = ffn_.forward(ln2);
     // out = y + ffn_out, so dY and dFFN both = grad_out, dY also gets residual
     Tensor dY = grad_out;  // will accumulate ffn backward's dY
@@ -234,18 +235,32 @@ Tensor TransformerBlock::backward(const Tensor& x, const Tensor& grad_out) const
     // dFFN's grad to y via ln2 Actually ffn backward returns dLn2, then layernorm backward gives
     // dY_2 Simplify: dLn2 = dFFN (output of ffn backward is dLn2)
     Tensor dLn2 = dFFN;
-    auto ln2_bwd = y.layernorm_backward(dLn2, &ln2_gamma_);
-    Tensor dY_from_ln2 = ln2_bwd.grad_x;
-    const_cast<Tensor&>(ln2_gamma_).add_grad(ln2_bwd.grad_gamma);
-    const_cast<Tensor&>(ln2_beta_).add_grad(ln2_bwd.grad_beta);
+    Tensor dY_from_ln2;
+    if (use_rmsnorm_) {
+        auto rb = y.rmsnorm_backward(dLn2, &ln2_gamma_);
+        dY_from_ln2 = rb.grad_x;
+        const_cast<Tensor&>(ln2_gamma_).add_grad(rb.grad_w);
+    } else {
+        auto ln2_bwd = y.layernorm_backward(dLn2, &ln2_gamma_);
+        dY_from_ln2 = ln2_bwd.grad_x;
+        const_cast<Tensor&>(ln2_gamma_).add_grad(ln2_bwd.grad_gamma);
+        const_cast<Tensor&>(ln2_beta_).add_grad(ln2_bwd.grad_beta);
+    }
     Tensor dY_total = dY.add(dY_from_ln2);
     // y = x + attn_out, so dX and dAttn both = dY_total, dLn1 comes from attn
     Tensor dAttn = dY_total;
     Tensor dX_attn = attn_.backward(ln1, dAttn);
-    auto ln1_bwd = x.layernorm_backward(dX_attn, &ln1_gamma_);
-    Tensor dX_from_ln1 = ln1_bwd.grad_x;
-    const_cast<Tensor&>(ln1_gamma_).add_grad(ln1_bwd.grad_gamma);
-    const_cast<Tensor&>(ln1_beta_).add_grad(ln1_bwd.grad_beta);
+    Tensor dX_from_ln1;
+    if (use_rmsnorm_) {
+        auto rb = x.rmsnorm_backward(dX_attn, &ln1_gamma_);
+        dX_from_ln1 = rb.grad_x;
+        const_cast<Tensor&>(ln1_gamma_).add_grad(rb.grad_w);
+    } else {
+        auto ln1_bwd = x.layernorm_backward(dX_attn, &ln1_gamma_);
+        dX_from_ln1 = ln1_bwd.grad_x;
+        const_cast<Tensor&>(ln1_gamma_).add_grad(ln1_bwd.grad_gamma);
+        const_cast<Tensor&>(ln1_beta_).add_grad(ln1_bwd.grad_beta);
+    }
     Tensor dX = dY_total.add(dX_from_ln1);
     return dX;
 }

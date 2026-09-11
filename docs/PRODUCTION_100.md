@@ -86,7 +86,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 - [x] **C21 GQA generalize MQA** — `include/llm/transformer.h:Config{n_kv_heads}`,
   `src/attention.cpp`, `src/mqa.cpp` (keep `mqa_forward` as `n_kv_heads=1` alias).
   Test: `n_kv_heads=n_heads` ≡ MHA; `=1` ≡ MQA; `=4` KV-cache 3× smaller.
-- [ ] **C22 RMSNorm config switch** — `include/llm/model.h:Config{norm=RMS|Layer}`.
+- [x] **C22 RMSNorm config switch** — `include/llm/model.h:Config{norm=RMS|Layer}`.
   Wire through `TransformerBlock` + `ln_f`. Test: RMS model trains 10 steps, ppl finite.
 - [ ] **C23 YaRN rope scaling** — `src/model.cpp:36` extend `rope_scaling` to `{ntk, yarn}` modes.
   Add `Config{rope_yarn_alpha, rope_yarn_beta}`. Test: 8k context (`rope_theta=50000`) forward no NaN.
