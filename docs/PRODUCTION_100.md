@@ -92,9 +92,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   Add `Config{rope_yarn_alpha, rope_yarn_beta}`. Test: 8k context (`rope_theta=50000`) forward no NaN.
 - [x] **C24 ALiBi⊕RoPE guard** — `src/model.cpp`, `src/alibi.cpp`.
   `validate_config` rejects `alibi && pos_encoding==RoPE` (mutually exclusive). Test asserts exit code.
-- [ ] **C25 Hybrid sliding+global** — `src/sliding.cpp`, `include/llm/model.h:Config{sliding_window=512, global_every=4}`.
+- [x] **C25 Hybrid sliding+global** — `src/sliding.cpp`, `include/llm/model.h:Config{sliding_window=512, global_every=4}`.
   Every 4th layer full attention. Test: 2k-token forward matches full-attn ppl within 5%.
-- [ ] **C26 MoE balance loss** — `src/moe.cpp`, `src/trainer.cpp`.
+- [x] **C26 MoE balance loss** — `src/moe.cpp`, `src/trainer.cpp`.
   Add `aux_loss = load_balance_coef * CV(gate)^2`, wire into `train_step`.
   Test: uniform routing → aux≈0; collapsed routing → aux>0.
 - [ ] **C27 LoRA merge/unmerge** — `src/lora.cpp` (exists, complete it).

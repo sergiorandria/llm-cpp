@@ -32,6 +32,12 @@ struct Config {
     size_t sliding_window = 0; // C25: 0 = full attention, else local window
     size_t global_every = 1; // C25: every Nth layer is global when sliding
 };
+// C25: hybrid pattern — layer idx global iff (idx+1) % global_every == 0 (or sliding off)
+inline bool is_global_layer(size_t idx, size_t global_every, size_t sliding_window) {
+    if (sliding_window == 0) return true;
+    if (global_every == 0) return true;
+    return ((idx + 1) % global_every) == 0;
+}
 
 class GPT {
 public:

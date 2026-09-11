@@ -110,3 +110,5 @@ add_executable(test_rmsnorm_model test_rmsnorm_model.cpp ../src/model.cpp ../src
 add_test(NAME rmsnorm_model COMMAND test_rmsnorm_model)
 add_executable(test_yarn_guard test_yarn_guard.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/config.cpp ../src/layernorm.cpp ../src/utils.cpp)
 add_test(NAME yarn_guard COMMAND test_yarn_guard)
+add_executable(test_hybrid_moe test_hybrid_moe.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/moe.cpp ../src/sliding.cpp ../src/layernorm.cpp ../src/utils.cpp)
+add_test(NAME hybrid_moe COMMAND test_hybrid_moe)

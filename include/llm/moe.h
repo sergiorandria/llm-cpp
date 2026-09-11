@@ -8,6 +8,8 @@ class MoEFFN {
 public:
     MoEFFN(size_t n_embd, MoEConfig cfg={});
     Tensor forward(const Tensor& x) const;
+    // C26: load-balancing aux loss — CV^2 of gate probs (0 = uniform, >0 = collapsed)
+    float aux_loss(const Tensor& x, float coef = 0.01f) const;
 private:
     MoEConfig cfg_;
     std::vector<Tensor> experts_W1_, experts_W2_;

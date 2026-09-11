@@ -75,3 +75,5 @@
 - C22 RMSNorm switch: `Config::use_rmsnorm` + `TransformerConfig::use_rmsnorm`, block + ln_f forward/incr/backward branch, `test_rmsnorm_model` trains.
 - C23 YaRN: `rope_cfg` NTK base*scaling + YaRN ramp/attn-scale (`model.cpp`), `rope_mode/yarn_alpha/yarn_beta`, ntk-vs-yarn differ 0.19.
 - C24 Guard: `validate_config` rejects alibi+RoPE, scaling>=1, global_every>0, `test_yarn_guard`.
+- C25 Hybrid: `is_global_layer(idx, every, window)` + sliding≤window property, `test_hybrid_moe`.
+- C26 MoE aux: `MoEFFN::aux_loss` CV² load-balance, uniform≈0, `test_hybrid_moe`.
