@@ -33,4 +33,20 @@ float quantize_error(const Tensor& orig, const QuantizedTensor& qt){
     float err=0; for(size_t i=0;i<orig.data.size();++i) err+= std::abs(orig.data[i]-rec.data[i]);
     return err / orig.data.size();
 }
+Tensor matmul_int8(const Tensor& act, const QuantizedTensor& wqt){
+    assert(act.shape.size() == 2 && wqt.q.shape.size() == 2);
+    assert(act.shape[1] == wqt.q.shape[0]);
+    Tensor out({act.shape[0], wqt.q.shape[1]}, 0.0f);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (size_t i = 0; i < act.shape[0]; ++i) {
+        for (size_t k = 0; k < act.shape[1]; ++k) {
+            float a = act(i, k);
+            for (size_t j = 0; j < wqt.q.shape[1]; ++j) out(i, j) += a * wqt.q(k, j);
+        }
+    }
+    for (auto& v : out.data) v *= wqt.scale;
+    return out;
+}
 }

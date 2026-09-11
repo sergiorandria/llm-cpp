@@ -96,4 +96,5 @@
 - E44 Stop: `should_stop(id, eos, stop_ids)`, E46 `apply_freq_presence` exact, E47 `apply_logit_bias` (-inf bans 100/100), `test_sampling_pen`.
 - E48 Spec gate: `test_spec_gate` equivalence + wall-clock (tiny scale speedup=0.39 — slower; 2x claim needs draft<<target), dashboard entry.
 - E49 Beam: `BeamConfig{len_penalty, early_stop}` + `beam_search_cfg`, legacy delegates, `test_beam_pen`.
+- E50 Int8 GEMM: fused `matmul_int8(act, wq*scale)` (no dequant pass, err 6e-8), model ppl +0.0004% (<2%), `test_int8_infer`. Track E complete (10/10).
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.

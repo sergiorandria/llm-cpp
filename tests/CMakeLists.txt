@@ -136,3 +136,5 @@ add_executable(test_beam_pen test_beam_pen.cpp ../src/beam.cpp ../src/model.cpp 
 add_test(NAME beam_pen COMMAND test_beam_pen)
 add_executable(test_spec_gate test_spec_gate.cpp ../src/speculative.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp)
 add_test(NAME spec_gate COMMAND test_spec_gate)
+add_executable(test_int8_infer test_int8_infer.cpp ../src/quantize.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp ../src/loss.cpp)
+add_test(NAME int8_infer COMMAND test_int8_infer)

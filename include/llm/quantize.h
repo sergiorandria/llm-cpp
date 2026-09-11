@@ -13,4 +13,7 @@ Tensor dequantize(const QuantizedTensor& qt);
 // Model-level quantization (int8 for all linear weights)
 void quantize_model(GPT& model);
 float quantize_error(const Tensor& orig, const QuantizedTensor& qt);
+// E50: fused int8 GEMM — out = act @ (wq*scale) computed as scale*sum(act*wq)
+// without materializing a dequantized weight pass. wq holds rounded int levels.
+Tensor matmul_int8(const Tensor& act, const QuantizedTensor& wqt);
 }

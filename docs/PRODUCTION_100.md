@@ -156,7 +156,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   Record draft/target sizes + measured speedup; CI warns if batched verify slower than greedy.
 - [x] **E49 Beam length penalty + early stop** — `src/beam.cpp:BeamConfig{len_penalty=0.6, early_stop=true}`.
   Score `logprob / len^penalty`. Test: penalty=0 prefers longer; large penalty prefers shorter.
-- [ ] **E50 Quantized GEMM inference** — `src/quantize.cpp` (fix `quantize.h:8` float-stub).
+- [x] **E50 Quantized GEMM inference** — `src/quantize.cpp` (fix `quantize.h:8` float-stub).
   Real `int8` storage + `int8_gemm(u8/s8, scale)` dispatch in `Tensor::matmul` when `model.is_quantized()`.
   Test: int8 ppl within 2% of fp32 on tiny model.
 
