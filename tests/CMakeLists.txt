@@ -126,3 +126,5 @@ add_executable(test_accum_logger test_accum_logger.cpp ../src/model.cpp ../src/a
 add_test(NAME accum_logger COMMAND test_accum_logger)
 add_executable(test_keeper test_keeper.cpp ../src/checkpoint.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp)
 add_test(NAME keeper COMMAND test_keeper)
+add_executable(test_infer_engine test_infer_engine.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp)
+add_test(NAME infer_engine COMMAND test_infer_engine)

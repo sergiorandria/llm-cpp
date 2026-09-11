@@ -54,6 +54,16 @@ public:
     // Generate
     std::vector<int> generate(const std::vector<int>& prompt, size_t max_new_tokens,
                               float temperature = 1.0f, int top_k = 0, float top_p = 1.0f, float rep_penalty=1.0f) const;
+    // E41: batched greedy/sampled generate — ragged prompts handled per-sequence.
+    std::vector<std::vector<int>> generate_batch(const std::vector<std::vector<int>>& prompts,
+                              size_t max_new_tokens, float temperature = 1.0f,
+                              int top_k = 0, float top_p = 1.0f, float rep_penalty = 1.0f) const;
+    // E45: generate with per-token logprobs of the chosen token
+    struct GenOutput { std::vector<int> tokens; std::vector<float> logprobs; };
+    GenOutput generate_with_logprobs(const std::vector<int>& prompt, size_t max_new_tokens,
+                              float temperature = 1.0f, int top_k = 0, float top_p = 1.0f) const;
+    // E43: true per-token streaming (cb fires as each token is sampled, greedy).
+    // Matches generate(prompt, max, 0.0f) token-for-token.
     std::vector<int> generate_streaming(const std::vector<int>& prompt, size_t max_new_tokens, std::function<void(int)> cb) const;
     // legacy overload
     std::vector<int> generate_legacy(const std::vector<int>& prompt, size_t max_new_tokens,

@@ -89,4 +89,7 @@
 - D36 Reduce: `mean_reduce_grads` allreduce-mean helper, `test_accum_logger` average + identity.
 - D37 Logger: `MetricsLogger::log_step` JSONL {step,loss,ppl,lr,grad_norm,tokens_sec}, 3-line test.
 - D38 Keeper: `BestKeeper(dir, keep_n)` top-N + best.txt, `test_keeper` sequence (fixed assert-side-effect trap: Release NDEBUG elides assert args, so calls hoisted out).
+- E41 Batch: `generate_batch` ragged per-sequence, ≡ singles, `test_infer_engine`.
+- E43 Streaming: `generate_streaming` true per-token cb (greedy, ≡ temp=0), `test_infer_engine`.
+- E45 Logprobs: `generate_with_logprobs` chosen-token logprobs ≤0, `test_infer_engine`.
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.

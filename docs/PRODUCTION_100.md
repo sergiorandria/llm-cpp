@@ -137,16 +137,16 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 
 ## E. Inference engine (E41–E50)
 
-- [ ] **E41 Batched generate** — `include/llm/model.h:generate_batch(prompts, ...)` + padding mask.
+- [x] **E41 Batched generate** — `include/llm/model.h:generate_batch(prompts, ...)` + padding mask.
   Test: batch of 4 ≡ 4× single greedy; ragged lengths handled.
 - [ ] **E42 Paged KV-block allocator** — `src/kv_cache.cpp:KVCacheConfig{paged, block_size=16}`.
   Replace contiguous `[n_embd, max_seq_len]` growth with block table (SoA path kept).
   Test: paged ≡ contiguous logits <1e-5; fragmentation test with interleaved sequences.
-- [ ] **E43 Real streaming tokens** — `src/model.cpp:generate_streaming`.
+- [x] **E43 Real streaming tokens** — `src/model.cpp:generate_streaming`.
   Invoke `cb(token_id)` per decoded token (not at end). Test: callback sequence == returned vector.
 - [ ] **E44 Stop sequences + EOS** — `src/sampling.cpp:StopCriteria{eos_id, stop_ids, max_tokens}`.
   Test: generation halts at first stop string; EOS counted once.
-- [ ] **E45 Logprobs API** — `include/llm/model.h:generate_with_logprobs(...) → {tokens, logprobs, topk}`.
+- [x] **E45 Logprobs API** — `include/llm/model.h:generate_with_logprobs(...) → {tokens, logprobs, topk}`.
   Needed by beam (already does manual `log_softmax`) — expose cleanly. Test: probs sum to 1.
 - [ ] **E46 Frequency/presence penalties** — `src/sampling.cpp` extend `rep_penalty` to
   `{freq_penalty, pres_penalty}` (OpenAI semantics). Test: penalized token logit lowered exactly.

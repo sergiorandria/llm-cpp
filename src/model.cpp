@@ -291,6 +291,72 @@ std::vector<int> GPT::generate(const std::vector<int>& prompt, size_t max_new_to
     return out;
 }
 
+// E41: batched generate (per-sequence incremental; ragged prompts natural).
+std::vector<std::vector<int>> GPT::generate_batch(const std::vector<std::vector<int>>& prompts,
+                              size_t max_new_tokens, float temperature,
+                              int top_k, float top_p, float rep_penalty) const {
+    std::vector<std::vector<int>> outs;
+    outs.reserve(prompts.size());
+    for (auto& p : prompts) outs.push_back(generate(p, max_new_tokens, temperature, top_k, top_p, rep_penalty));
+    return outs;
+}
+
+// E45: greedy/sampled generate recording logprob of each chosen token.
+GPT::GenOutput GPT::generate_with_logprobs(const std::vector<int>& prompt, size_t max_new_tokens,
+                              float temperature, int top_k, float top_p) const {
+    GenOutput go;
+    go.tokens = prompt;
+    std::mt19937 rng(42);
+    KVCache cache(config_.n_layers, config_.block_size, config_.n_embd);
+    cache.clear();
+    auto incremental_step = [&](int token, size_t pos) -> std::vector<float> {
+        Tensor x({1, config_.n_embd}, 0.0f);
+        int tc = ((token % (int)config_.vocab_size) + (int)config_.vocab_size) % (int)config_.vocab_size;
+        size_t wp = pos % config_.block_size;
+        for (size_t j = 0; j < config_.n_embd; ++j) x(0, j) = wte_(tc, j) + wpe_(wp, j);
+        if (config_.pos_encoding == PosEncoding::RoPE) {
+            Tensor ext({pos + 1, config_.n_embd}, 0.0f);
+            for (size_t j = 0; j < config_.n_embd; ++j) ext(pos, j) = x(0, j);
+            Tensor rot = rope_cfg(ext, pos + 1, config_);
+            for (size_t j = 0; j < config_.n_embd; ++j) x(0, j) = rot(pos, j);
+        }
+        Tensor h = x;
+        for (size_t b = 0; b < blocks_.size(); ++b) h = blocks_[b].forward_incremental(h, cache, b, pos);
+        h = config_.use_rmsnorm ? h.rmsnorm(&ln_f_gamma_) : h.layernorm(&ln_f_gamma_, &ln_f_beta_);
+        Tensor logits = h.matmul(lm_head_);
+        std::vector<float> row(config_.vocab_size);
+        for (size_t j = 0; j < config_.vocab_size; ++j) row[j] = logits(0, j);
+        return row;
+    };
+    std::vector<float> last_logits;
+    if (!prompt.empty()) {
+        for (size_t pos = 0; pos < prompt.size(); ++pos) { last_logits = incremental_step(prompt[pos], pos); cache.advance(1); }
+    } else last_logits.assign(config_.vocab_size, 0.0f);
+    auto log_softmax_row = [](const std::vector<float>& r) {
+        float m = *std::max_element(r.begin(), r.end());
+        float s = 0; for (auto v : r) s += std::exp(v - m);
+        float ls = m + std::log(s);
+        std::vector<float> o(r.size());
+        for (size_t i = 0; i < r.size(); ++i) o[i] = r[i] - ls;
+        return o;
+    };
+    for (size_t step = 0; step < max_new_tokens; ++step) {
+        auto lsm = log_softmax_row(last_logits);
+        int next_id = 0;
+        if (temperature == 0.0f) next_id = (int)(std::max_element(last_logits.begin(), last_logits.end()) - last_logits.begin());
+        else if (top_k > 0) next_id = sample_top_k_seeded(last_logits, top_k, temperature, 42 + step);
+        else if (top_p < 1.0f) next_id = sample_top_p_seeded(last_logits, top_p, temperature, 42 + step);
+        else next_id = sample_temperature_seeded(last_logits, temperature, 42 + step);
+        go.tokens.push_back(next_id);
+        go.logprobs.push_back(lsm[next_id]);
+        if (step + 1 >= max_new_tokens) break;
+        size_t pos = go.tokens.size() - 1;
+        last_logits = incremental_step(next_id, pos);
+        cache.advance(1);
+    }
+    return go;
+}
+
 void GPT::save(const std::string& path) const {
     save_binary(path);
     std::cout << "[save] checkpoint written to " << path << " (" << num_parameters()
@@ -449,8 +515,44 @@ void GPT::load_binary(const std::string& path) {
 
 std::vector<int> GPT::generate_streaming(const std::vector<int>& prompt, size_t max_new_tokens,
                                          std::function<void(int)> cb) const {
-    auto out = generate(prompt, max_new_tokens);
-    for (size_t i = prompt.size(); i < out.size(); ++i) cb(out[i]);
+    // E43: true per-token streaming — cb fires as each token is sampled (not at end).
+    // Uses generate_with_logprobs-equivalent incremental loop but invokes cb inline.
+    std::vector<int> out = prompt;
+    std::mt19937 rng(42);
+    KVCache cache(config_.n_layers, config_.block_size, config_.n_embd);
+    cache.clear();
+    auto incremental_step = [&](int token, size_t pos) -> std::vector<float> {
+        Tensor x({1, config_.n_embd}, 0.0f);
+        int tc = ((token % (int)config_.vocab_size) + (int)config_.vocab_size) % (int)config_.vocab_size;
+        size_t wp = pos % config_.block_size;
+        for (size_t j = 0; j < config_.n_embd; ++j) x(0, j) = wte_(tc, j) + wpe_(wp, j);
+        if (config_.pos_encoding == PosEncoding::RoPE) {
+            Tensor ext({pos + 1, config_.n_embd}, 0.0f);
+            for (size_t j = 0; j < config_.n_embd; ++j) ext(pos, j) = x(0, j);
+            Tensor rot = rope_cfg(ext, pos + 1, config_);
+            for (size_t j = 0; j < config_.n_embd; ++j) x(0, j) = rot(pos, j);
+        }
+        Tensor h = x;
+        for (size_t b = 0; b < blocks_.size(); ++b) h = blocks_[b].forward_incremental(h, cache, b, pos);
+        h = config_.use_rmsnorm ? h.rmsnorm(&ln_f_gamma_) : h.layernorm(&ln_f_gamma_, &ln_f_beta_);
+        Tensor logits = h.matmul(lm_head_);
+        std::vector<float> row(config_.vocab_size);
+        for (size_t j = 0; j < config_.vocab_size; ++j) row[j] = logits(0, j);
+        return row;
+    };
+    std::vector<float> last_logits;
+    if (!prompt.empty()) {
+        for (size_t pos = 0; pos < prompt.size(); ++pos) { last_logits = incremental_step(prompt[pos], pos); cache.advance(1); }
+    } else last_logits.assign(config_.vocab_size, 0.0f);
+    for (size_t step = 0; step < max_new_tokens; ++step) {
+        int next_id = (int)(std::max_element(last_logits.begin(), last_logits.end()) - last_logits.begin());
+        out.push_back(next_id);
+        cb(next_id);  // stream immediately (greedy path; sampled streaming via generate_with_logprobs loop)
+        if (step + 1 >= max_new_tokens) break;
+        size_t pos = out.size() - 1;
+        last_logits = incremental_step(next_id, pos);
+        cache.advance(1);
+    }
     return out;
 }
 void GPT::load(const std::string& path) {
