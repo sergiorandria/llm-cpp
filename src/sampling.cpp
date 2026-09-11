@@ -1,8 +1,9 @@
 #include "llm/sampling.h"
 #include "llm/utils.h"
 #include <algorithm>
-#include <random>
 #include <cmath>
+#include <limits>
+#include <random>
 namespace llm {
 int sample_greedy(const std::vector<float>& logits){ return std::max_element(logits.begin(), logits.end()) - logits.begin(); }
 int sample_temperature_seeded(const std::vector<float>& logits, float temp, uint64_t seed){
@@ -46,5 +47,29 @@ std::vector<float> apply_repetition_penalty(const std::vector<float>& logits, co
     std::vector<float> out=logits;
     for(int id: gen) if(id>=0 && id<(int)out.size()){ if(out[id]>0) out[id]/=penalty; else out[id]*=penalty; }
     return out;
+}
+// E46
+std::vector<float> apply_freq_presence(const std::vector<float>& logits, const std::vector<int>& gen,
+                                       float freq_penalty, float pres_penalty){
+    std::vector<float> out=logits;
+    std::unordered_map<int,int> counts;
+    for(int id: gen) if(id>=0 && id<(int)out.size()) counts[id]++;
+    for(auto& kv : counts){
+        out[kv.first] -= freq_penalty * (float)kv.second + pres_penalty;
+    }
+    return out;
+}
+// E47
+std::vector<float> apply_logit_bias(const std::vector<float>& logits,
+                                    const std::unordered_map<int,float>& bias){
+    std::vector<float> out=logits;
+    for(auto& kv : bias) if(kv.first>=0 && kv.first<(int)out.size()) out[kv.first]+=kv.second;
+    return out;
+}
+// E44
+bool should_stop(int next_id, int eos_id, const std::vector<int>& stop_ids){
+    if(next_id==eos_id) return true;
+    for(int s: stop_ids) if(next_id==s) return true;
+    return false;
 }
 }

@@ -2,7 +2,7 @@
 #include "tensor.h"
 #include <vector>
 namespace llm {
-struct KVCacheConfig { bool soa = false; }; // SoA [n_embd, max_seq_len] better for head slices
+struct KVCacheConfig { bool soa = false; bool paged = false; size_t page_size = 16; }; // SoA [n_embd, max_seq_len] better for head slices
 class KVCache {
 public:
     KVCache(size_t n_layers, size_t max_seq_len, size_t n_embd, KVCacheConfig cfg = {});
@@ -13,14 +13,21 @@ public:
     Tensor get_k_slice(size_t layer) const;
     Tensor get_v_slice(size_t layer) const;
     void clear();
+    // E42: release all pages (free-list evict); next update reallocates lazily
+    void evict();
+    size_t num_pages(size_t layer) const;
     size_t size() const { return cur_len_; }
     void set_size(size_t n) { cur_len_ = std::min(n, max_seq_len_); }
     void advance(size_t n) { cur_len_ = std::min(cur_len_ + n, max_seq_len_); }
     bool is_soa() const { return cfg_.soa; }
+    bool is_paged() const { return cfg_.paged; }
 private:
     size_t n_layers_, max_seq_len_, n_embd_;
     KVCacheConfig cfg_;
     std::vector<Tensor> k_cache_, v_cache_;
+    // E42 paged blocks: pages[l][p] is [page_size, n_embd], allocated lazily
+    std::vector<std::vector<Tensor>> pages_k_, pages_v_;
+    void ensure_page(size_t layer, size_t page) const;
     size_t cur_len_=0;
 };
 }

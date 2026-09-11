@@ -92,4 +92,6 @@
 - E41 Batch: `generate_batch` ragged per-sequence, ≡ singles, `test_infer_engine`.
 - E43 Streaming: `generate_streaming` true per-token cb (greedy, ≡ temp=0), `test_infer_engine`.
 - E45 Logprobs: `generate_with_logprobs` chosen-token logprobs ≤0, `test_infer_engine`.
+- E42 Paged KV: `KVCacheConfig{paged,page_size}` block table + `evict/num_pages`, paged≡contig 0.0, `test_paged_kv`.
+- E44 Stop: `should_stop(id, eos, stop_ids)`, E46 `apply_freq_presence` exact, E47 `apply_logit_bias` (-inf bans 100/100), `test_sampling_pen`.
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.
