@@ -250,7 +250,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   `Tensor::matmul` dispatches CPU/CUDA; CPU-only build unchanged. Test: skipped gracefully when no GPU.
 - [x] **I88 Quantized BLAS dispatch** — `src/tensor.cpp:100` extend `USE_OPENBLAS` path to `cblas_gemm_s8u8s32`
   when `F51` int8 present; fallback blocked int8 GEMM. Test: int8 GEMM ≡ fp32 within quant bound.
-- [ ] **I89 Infer benchmark + gate** — `scripts/bench_infer.cpp` (new) `tokens/sec, ms/token, p50/p95`.
+- [x] **I89 Infer benchmark + gate** — `scripts/bench_infer.cpp` (new) `tokens/sec, ms/token, p50/p95`.
   `.github/workflows/bench.yml` fails on >10% regression vs `docs/BENCHMARK_DASHBOARD.md` baseline.
 - [x] **I90 Alignment + padding** — `src/tensor.cpp` 64B-aligned alloc, pad `vocab`/`n_embd` to mult of 32.
   Test: all `data.data()` 64B-aligned; padded matmul ≡ unpadded.

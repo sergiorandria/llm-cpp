@@ -133,5 +133,6 @@
 - I85/I86/I90 Memory: `TensorPool` shape-keyed recycling + `KVCache::set_pool` evict-to-pool (100 cycles: 6 misses, 596 hits); 64B-aligned `Tensor::data/grad` via AlignedAllocator (`test_pool` alignment + exact matmul). Also fixed pool.h includes-inside-namespace breakage.
 - I87 Backend: `backend.h` CPU/CUDA abstraction + `-DUSE_CUDA=ON` (warns + CPU fallback without toolkit), `test_backend` graceful CPU.
 - I88 Int8 MACs: I8×I8 accumulates in int32 with single scale (cublas/s8 hook documented), mixed keeps folded-float; i8xi8 err 0.003, `test_int8_dtype` extended. Fixed 51 test targets missing pool.cpp.
+- I89 Bench: `bench_infer` (trials p50/p95, tok/s) + `bench.yml` 10% gate vs 352.6 baseline; found nested-OpenMP oversubscription (0.37 vs 352 tok/s — pin threads=1), documented in BUILD.md.
 - Build: `profiling.cpp` added to 45 test targets + llm-c-api (new PROFILE refs).
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.
