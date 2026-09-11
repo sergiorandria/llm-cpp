@@ -56,3 +56,4 @@
 - A03 CE backward: `cross_entropy_backward(logits, targets, smoothing)` (`loss.h/cpp`), `TrainConfig::label_smoothing`, `Trainer::train_step` uses it, `test_ce_backward` row-sum=0 + smoothing.
 - A04 AdamW: decoupled `p -= lr*wd*p` with `wd_` (was hardcoded 0.01*wd), auto-skip 1D bias/norm + explicit flags, `test_adamw` decay + Rosenbrock.
 - A05 Clip helper: `clip_by_global_norm(grads, max)` shared (`optimizer.h/cpp`), `Trainer::clip_grads` delegates, `test_clip_norm`.
+- A06 Determinism: `set_global_seed/global_seed` (`utils.h/cpp`), seeded sampling overloads (`sampling.h/cpp`), `test_dropout_seed` same-seed identical.

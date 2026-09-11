@@ -37,7 +37,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 - [x] **A05 Global-norm grad clipping** — `src/trainer.cpp` (+ `optimizer.h` helper `clip_grad_norm_`).
   Already asserted in `test_grad_clip.cpp`; extract to shared `clip_by_global_norm(params, 1.0)`.
   Test: norm>1 scaled to 1, norm<1 untouched.
-- [ ] **A06 Dropout determinism** — `src/tensor.cpp:dropout`.
+- [x] **A06 Dropout determinism** — `src/tensor.cpp:dropout`.
   Thread `std::mt19937& rng` everywhere (attention, FFN); add `set_global_seed(seed)`.
   Test: same seed → identical forward; different seed → differs w.p. high.
 - [ ] **A07 NaN/Inf detector in train_step** — `src/trainer.cpp`.
