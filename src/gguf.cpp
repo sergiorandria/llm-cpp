@@ -89,7 +89,7 @@ static size_t gguf_nbytes(size_t n, uint32_t dtype) {
 static void write_encoded(std::ofstream& out, const Tensor& t, uint32_t dtype) {
     size_t n = t.data.size();
     if (dtype == GGUF_DTYPE_F32) { out.write((char*)t.data.data(), n * sizeof(float)); return; }
-    std::vector<float> padded = t.data;
+    std::vector<float> padded(t.data.begin(), t.data.end());
     while (padded.size() % GGUF_QBLK) padded.push_back(0.0f);
     if (dtype == GGUF_DTYPE_Q8_0) {
         for (size_t b = 0; b < padded.size(); b += GGUF_QBLK) {

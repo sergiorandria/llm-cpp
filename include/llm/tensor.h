@@ -8,6 +8,8 @@
 #include <stdexcept>
 #include <vector>
 
+#include "pool.h"
+
 #ifdef USE_NUMPY_CPP
 #include <np/linalg.hpp>
 #include <np/np.hpp>
@@ -24,8 +26,8 @@ enum class DType { F32, I8 };
 
 class Tensor {
    public:
-    std::vector<float> data;
-    mutable std::vector<float> grad;  // for autograd (mutable so const backward can accumulate)
+    FloatVec data;  // I90: 64B-aligned storage
+    mutable FloatVec grad;  // for autograd (mutable so const backward can accumulate)
     std::vector<size_t> shape;
     std::vector<size_t> strides;
     DType dtype = DType::F32;
@@ -36,6 +38,8 @@ class Tensor {
     explicit Tensor(std::vector<size_t> shape_, float fill = 0.0f);
 
     size_t numel() const;
+    // Reshape in place (total elements must match; keeps storage, recomputes strides)
+    void reshape(const std::vector<size_t>& shape_);
     size_t ndim() const {
         return shape.size();
     }

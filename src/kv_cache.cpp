@@ -17,8 +17,13 @@ void KVCache::ensure_page(size_t layer, size_t page) const {
     auto& pk = const_cast<std::vector<std::vector<Tensor>>&>(pages_k_);
     auto& pv = const_cast<std::vector<std::vector<Tensor>>&>(pages_v_);
     while (pk[layer].size() <= page) {
-        pk[layer].emplace_back(Tensor({cfg_.page_size, n_embd_}, 0.0f));
-        pv[layer].emplace_back(Tensor({cfg_.page_size, n_embd_}, 0.0f));
+        if (pool_) {
+            pk[layer].push_back(pool_->acquire({cfg_.page_size, n_embd_}));
+            pv[layer].push_back(pool_->acquire({cfg_.page_size, n_embd_}));
+        } else {
+            pk[layer].emplace_back(Tensor({cfg_.page_size, n_embd_}, 0.0f));
+            pv[layer].emplace_back(Tensor({cfg_.page_size, n_embd_}, 0.0f));
+        }
     }
 }
 void KVCache::update(size_t layer, const Tensor& k, const Tensor& v){
@@ -98,7 +103,14 @@ Tensor KVCache::get_v_slice(size_t layer) const {
     }
 }
 void KVCache::clear(){ cur_len_=0; for(auto &t: k_cache_) t.fill(0); for(auto &t: v_cache_) t.fill(0); evict(); }
-void KVCache::evict(){ for(auto &pl: pages_k_) pl.clear(); for(auto &pl: pages_v_) pl.clear(); }
+void KVCache::evict(){
+    // I85: with a pool, pages go back for reuse (free-list); else freed
+    if (pool_) {
+        for (auto& pl : pages_k_) for (auto& pg : pl) pool_->release(std::move(pg));
+        for (auto& pl : pages_v_) for (auto& pg : pl) pool_->release(std::move(pg));
+    }
+    for(auto &pl: pages_k_) pl.clear(); for(auto &pl: pages_v_) pl.clear();
+}
 size_t KVCache::num_pages(size_t layer) const {
     if(!cfg_.paged || layer >= pages_k_.size()) return 0;
     return pages_k_[layer].size();

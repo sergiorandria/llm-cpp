@@ -130,5 +130,6 @@
 - I83 Autotune: `autotune_flash.py` also emits `gemm_config.h` (M=N=K=64 advisory, wired into naive GEMM tiling) + per-section dashboard (E48 preserved); retuned flash 32→128 on this box (flat ~11ms landscape).
 - FIX (critical): `Tensor::from_ndarray` raw-copied shared storage, silently un-transposing numpy views — every `matmul(K.transpose())` under USE_NUMPY_CPP=ON computed wrong scores (found via I84: flash-vs-naive 0.04). Now copies logical order (`arr(i,j)` when non-contiguous), flash-vs-naive 7e-8. `test_transpose` regression. NOTE: all pre-fix attention numerics/ppl under numpy builds are suspect; OFF builds were always correct.
 - I84 FlashAttention-2: `flash_attention_full` online-softmax O(D+block) (≡ naive/fa1 7e-8), T>128 dispatch switched, `test_flash2` causal+noncausal.
+- I85/I86/I90 Memory: `TensorPool` shape-keyed recycling + `KVCache::set_pool` evict-to-pool (100 cycles: 6 misses, 596 hits); 64B-aligned `Tensor::data/grad` via AlignedAllocator (`test_pool` alignment + exact matmul). Also fixed pool.h includes-inside-namespace breakage.
 - Build: `profiling.cpp` added to 45 test targets + llm-c-api (new PROFILE refs).
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.

@@ -26,6 +26,16 @@ size_t Tensor::numel() const {
     return n;
 }
 
+void Tensor::reshape(const std::vector<size_t>& shape_) {
+    size_t n = 1;
+    for (auto s : shape_) n *= s;
+    size_t have = (dtype == DType::I8) ? idata.size() : data.size();
+    // Fresh (empty) tensors may take any shape; otherwise sizes must match
+    assert(have == 0 || have == n);
+    shape = shape_;
+    compute_strides();
+}
+
 void Tensor::compute_strides() {
     strides.resize(shape.size());
     if (shape.empty()) return;

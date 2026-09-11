@@ -242,9 +242,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   Emit `include/llm/gemm_config.h`. `docs/BENCHMARK_DASHBOARD.md` records before/after.
 - [x] **I84 FlashAttention-2 full-prefill** — `src/flash_attention.cpp:flash_attention_full(Q,K,V,causal)`.
   Tiled online-softmax over `seq×seq` (today only incremental `1×K` path). Test: ≡ naive attn <1e-4.
-- [ ] **I85 KV-cache block reuse** — `src/kv_cache.cpp` free-list for evicted sequences (pairs with E42).
+- [x] **I85 KV-cache block reuse** — `src/kv_cache.cpp` free-list for evicted sequences (pairs with E42).
   Test: 100 sequential generations RSS stable (no growth).
-- [ ] **I86 Tensor memory pool** — `src/tensor.cpp:TensorPool{acquire(shape), release}` for activations.
+- [x] **I86 Tensor memory pool** — `src/tensor.cpp:TensorPool{acquire(shape), release}` for activations.
   `forward_with_hidden` reuses buffers. Test: 100 forwards no new `malloc` (count via hook).
 - [ ] **I87 CUDA backend abstraction** — `include/llm/backend.h` (new) + `cmake/FindCUDA.cmake` + `-DUSE_CUDA=ON`.
   `Tensor::matmul` dispatches CPU/CUDA; CPU-only build unchanged. Test: skipped gracefully when no GPU.
@@ -252,7 +252,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   when `F51` int8 present; fallback blocked int8 GEMM. Test: int8 GEMM ≡ fp32 within quant bound.
 - [ ] **I89 Infer benchmark + gate** — `scripts/bench_infer.cpp` (new) `tokens/sec, ms/token, p50/p95`.
   `.github/workflows/bench.yml` fails on >10% regression vs `docs/BENCHMARK_DASHBOARD.md` baseline.
-- [ ] **I90 Alignment + padding** — `src/tensor.cpp` 64B-aligned alloc, pad `vocab`/`n_embd` to mult of 32.
+- [x] **I90 Alignment + padding** — `src/tensor.cpp` 64B-aligned alloc, pad `vocab`/`n_embd` to mult of 32.
   Test: all `data.data()` 64B-aligned; padded matmul ≡ unpadded.
 
 ## J. Release & ecosystem (J91–J100)

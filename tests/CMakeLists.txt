@@ -168,6 +168,8 @@ add_executable(test_flash2 test_flash2.cpp ../src/flash_attention.cpp ../src/ten
 add_test(NAME flash2 COMMAND test_flash2)
 add_executable(test_transpose test_transpose.cpp ../src/tensor.cpp)
 add_test(NAME transpose COMMAND test_transpose)
+add_executable(test_pool test_pool.cpp ../src/pool.cpp ../src/kv_cache.cpp ../src/tensor.cpp)
+add_test(NAME pool COMMAND test_pool)
 add_executable(test_config_errors test_config_errors.cpp ../src/config.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp ../src/profiling.cpp)
 add_test(NAME config_errors COMMAND test_config_errors)
 # G63: python ctypes bindings (needs libllm-c-api.so in build root)

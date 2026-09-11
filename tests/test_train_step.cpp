@@ -94,7 +94,7 @@ int main() {
     assert(attn_w && "attention weight not found");
     assert(ffn_w && "ffn weight not found");
     // Check non-random: grad should be deterministic across two runs
-    std::vector<float> grad_attn_first = attn_w->grad;
+    llm::FloatVec grad_attn_first = attn_w->grad;
     tiny_model.zero_grad();
     auto [logits2, hidden2] = tiny_model.forward_with_hidden(tiny_batch);
     llm::Tensor dlogits2 = logits2.softmax(1);

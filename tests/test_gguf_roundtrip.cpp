@@ -18,7 +18,7 @@ int main() {
     auto l1 = m1.forward(prompt);
     // Also test params bit-exact
     auto p1_before = m1.parameters();
-    std::vector<std::vector<float>> snapshot;
+    std::vector<llm::FloatVec> snapshot;
     snapshot.reserve(p1_before.size());
     for (auto* p : p1_before) snapshot.push_back(p->data);
 
