@@ -7,8 +7,8 @@
 #include <random>
 
 #include "llm/kv_cache.h"
+#include "llm/profiling.h"
 #include "llm/sampling.h"
-
 namespace llm {
 
 GPT::GPT(const Config& config)
@@ -91,6 +91,7 @@ Tensor GPT::forward(const std::vector<int>& tokens) const {
     return forward_with_hidden(tokens).first;
 }
 std::pair<Tensor, Tensor> GPT::forward_with_hidden(const std::vector<int>& tokens) const {
+    PROFILE("forward");
     size_t T = tokens.size();
     assert(T <= config_.block_size);
     Tensor x({T, config_.n_embd}, 0.0f);

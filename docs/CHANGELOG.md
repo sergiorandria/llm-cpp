@@ -115,4 +115,6 @@
 - G69 Examples: `examples/curl.sh`, `python_openai.py` (stdlib, BASE env), `node_fetch.mjs` — all verified live; fixed real bug: `json_escape` now guarantees valid UTF-8 (stray bytes→U+FFFD), `test_server` asserts UTF-8 validity.
 - G63 Bindings: C ABI `libllm-c-api` (`c_api.cpp`: create/free/encode/decode/generate/params) + `python/llm_cpp` ctypes + `test_bind.py`, ctest `pybind` green (no pybind11 needed).
 - G64/G65 Deploy: multi-stage `Dockerfile` (non-root, HEALTHCHECK, serve entrypoint) + `docker-compose.yml` (volume + healthcheck, `compose config` OK; full image build deferred to tag CI — 25min+ locally).
+- H71 Logging: `format_json/log_json` ({ts,level,msg}+fields to stderr), `test_log_prof` key checks.
+- H73 Profiling: built-in `PROFILE(name)` ScopedTimer registry + `profiling_report`, wired attn/block/forward, `test_log_prof` all timers >0.
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.

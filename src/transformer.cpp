@@ -1,6 +1,7 @@
 #include "llm/transformer.h"
 
 #include "llm/fused.h"
+#include "llm/profiling.h"
 
 namespace llm {
 
@@ -195,6 +196,7 @@ TransformerBlock::TransformerBlock(size_t n_embd, size_t n_heads, size_t block_s
       use_rmsnorm_(cfg.use_rmsnorm) {}
 
 Tensor TransformerBlock::forward(const Tensor& x) const {
+    PROFILE("block");
     Tensor ln1 = use_rmsnorm_ ? x.rmsnorm(&ln1_gamma_) : x.layernorm(&ln1_gamma_, &ln1_beta_);
     Tensor attn_out = attn_.forward(ln1);
     Tensor y(x.shape, 0.0f);

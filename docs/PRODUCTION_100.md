@@ -209,11 +209,11 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 
 ## H. Observability & robustness (H71–H80)
 
-- [ ] **H71 Structured logging** — `src/logging.cpp:Logger{level=json}`.
+- [x] **H71 Structured logging** — `src/logging.cpp:Logger{level=json}`.
   `{ts, level, msg, step, tokens_sec}` to stderr. Test: `LOG_INFO` line parses as JSON.
 - [ ] **H72 Prometheus metrics** — `src/server.cpp:GET /metrics`.
   `tokens_total, requests_total, latency_histogram, kv_cache_bytes`. Test: scrape after 3 gens.
-- [ ] **H73 Profiling timers** — `include/llm/profiling.h` (exists, wire it).
+- [x] **H73 Profiling timers** — `include/llm/profiling.h` (exists, wire it).
   Scoped `PROFILE("attn")` in `attention.cpp`, `transformer.cpp`, `model.cpp`.
   `bench` prints per-op ms. Test: `test_profiling` asserts all timers >0.
 - [ ] **H74 OOM / length guards** — `src/model.cpp:generate` early `prompt.size()+max_new > block_size → 400/Err`.

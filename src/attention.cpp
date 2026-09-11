@@ -4,6 +4,7 @@
 
 #include "llm/flash_attention.h"
 #include "llm/flash_config.h"
+#include "llm/profiling.h"
 
 namespace llm {
 
@@ -32,6 +33,7 @@ MultiHeadAttention::MultiHeadAttention(size_t n_embd, size_t n_heads, size_t blo
 }
 
 Tensor MultiHeadAttention::forward(const Tensor& x, bool causal, float dropout_p) const {
+    PROFILE("attn");
     // x: [T, C] where C = n_heads * head_dim; true per-head attention
     assert(n_embd_ % n_heads_ == 0);
     size_t T = x.shape[0];
