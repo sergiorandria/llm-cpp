@@ -66,8 +66,8 @@ Tensor MultiHeadAttention::forward(const Tensor& x, bool causal, float dropout_p
         Tensor Vh = slice_head(V, h);
         Tensor out_h;
         if (T > 128) {
-            // FlashAttention tiled path: O(n) memory, cache-friendly
-            out_h = flash_attention(Qh, Kh, Vh, scale, causal);
+            // I84 FlashAttention-2 full prefill: online softmax, O(D+block) aux
+            out_h = flash_attention_full(Qh, Kh, Vh, scale, causal, FLASH_BLOCK_SIZE);
             if (dropout_p > 0.0f) {
                 std::mt19937 rng(123 + h);
                 out_h = out_h.dropout(dropout_p, rng);

@@ -240,7 +240,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   (verify AVX2/NEON dispatch, no scalar fallback on x86_64). Test: SIMD ≡ scalar <1e-6.
 - [x] **I83 GEMM autotune extension** — `scripts/autotune_flash.py` → also tune `GEMM_BLOCK_M/N/K`.
   Emit `include/llm/gemm_config.h`. `docs/BENCHMARK_DASHBOARD.md` records before/after.
-- [ ] **I84 FlashAttention-2 full-prefill** — `src/flash_attention.cpp:flash_attention_full(Q,K,V,causal)`.
+- [x] **I84 FlashAttention-2 full-prefill** — `src/flash_attention.cpp:flash_attention_full(Q,K,V,causal)`.
   Tiled online-softmax over `seq×seq` (today only incremental `1×K` path). Test: ≡ naive attn <1e-4.
 - [ ] **I85 KV-cache block reuse** — `src/kv_cache.cpp` free-list for evicted sequences (pairs with E42).
   Test: 100 sequential generations RSS stable (no growth).

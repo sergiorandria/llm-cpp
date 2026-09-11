@@ -75,4 +75,41 @@ Tensor flash_attention_incremental(const Tensor& Q, const Tensor& K, const Tenso
     }
     return out;
 }
+
+Tensor flash_attention_full(const Tensor& Q, const Tensor& K, const Tensor& V,
+                            float scale, bool causal, size_t block_size) {
+    size_t T = Q.shape[0];
+    size_t D = Q.shape[1];
+    size_t N = K.shape[0];
+    Tensor out({T, D}, 0.0f);
+    std::vector<float> acc(D);
+    for (size_t i = 0; i < T; ++i) {
+        size_t k_max = causal ? std::min(i + 1, N) : N;
+        float m = -1e30f, l = 0.0f;
+        std::fill(acc.begin(), acc.end(), 0.0f);
+        for (size_t kb = 0; kb < k_max; kb += block_size) {
+            size_t ke = std::min(kb + block_size, k_max);
+            float bm = -1e30f;
+            for (size_t j = kb; j < ke; ++j) {
+                float s = 0;
+                for (size_t d = 0; d < D; ++d) s += Q(i, d) * K(j, d);
+                bm = std::max(bm, s * scale);
+            }
+            float m_new = std::max(m, bm);
+            float a = std::exp(m - m_new);
+            l = l * a;
+            for (size_t d = 0; d < D; ++d) acc[d] *= a;
+            for (size_t j = kb; j < ke; ++j) {
+                float s = 0;
+                for (size_t d = 0; d < D; ++d) s += Q(i, d) * K(j, d);
+                float e = std::exp(s * scale - m_new);
+                l += e;
+                for (size_t d = 0; d < D; ++d) acc[d] += e * V(j, d);
+            }
+            m = m_new;
+        }
+        for (size_t d = 0; d < D; ++d) out(i, d) = acc[d] / l;
+    }
+    return out;
+}
 }
