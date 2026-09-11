@@ -170,18 +170,32 @@ Tensor Tensor::matmul(const Tensor& other) const {
     assert(shape[1] == other.shape[0]);
     return matmul_np(other);
 #else
-    // OpenMP parallelized when available
+    // Naive path (USE_NUMPY_CPP=OFF): tiled i/k/j with GEMM_BLOCK_* from gemm_config.h
+#ifdef __has_include
+#if __has_include("llm/gemm_config.h")
+#include "llm/gemm_config.h"
+#endif
+#endif
+#ifndef GEMM_BLOCK_M
+#define GEMM_BLOCK_M 64
+#define GEMM_BLOCK_N 64
+#define GEMM_BLOCK_K 64
+#endif
     assert(shape.size() == 2 && other.shape.size() == 2);
     assert(shape[1] == other.shape[0]);
     Tensor out({shape[0], other.shape[1]}, 0.0f);
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-    for (size_t i = 0; i < shape[0]; ++i) {
-        for (size_t k = 0; k < shape[1]; ++k) {
-            float a = (*this)(i, k);
-            for (size_t j = 0; j < other.shape[1]; ++j) {
-                out(i, j) += a * other(k, j);
+    for (size_t ii = 0; ii < shape[0]; ii += GEMM_BLOCK_M) {
+        for (size_t kk = 0; kk < shape[1]; kk += GEMM_BLOCK_K) {
+            for (size_t i = ii; i < std::min(ii + GEMM_BLOCK_M, shape[0]); ++i) {
+                for (size_t k = kk; k < std::min(kk + GEMM_BLOCK_K, shape[1]); ++k) {
+                    float a = (*this)(i, k);
+                    for (size_t j = 0; j < other.shape[1]; ++j) {
+                        out(i, j) += a * other(k, j);
+                    }
+                }
             }
         }
     }

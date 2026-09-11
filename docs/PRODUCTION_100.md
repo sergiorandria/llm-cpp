@@ -238,7 +238,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   Test: `bench_matmul` scales ≥1.5× 1→4 threads on 512².
 - [x] **I82 SIMD layernorm/softmax/gelu** — `src/tensor.cpp` via `USE_NUMPY_CPP` SIMD paths
   (verify AVX2/NEON dispatch, no scalar fallback on x86_64). Test: SIMD ≡ scalar <1e-6.
-- [ ] **I83 GEMM autotune extension** — `scripts/autotune_flash.py` → also tune `GEMM_BLOCK_M/N/K`.
+- [x] **I83 GEMM autotune extension** — `scripts/autotune_flash.py` → also tune `GEMM_BLOCK_M/N/K`.
   Emit `include/llm/gemm_config.h`. `docs/BENCHMARK_DASHBOARD.md` records before/after.
 - [ ] **I84 FlashAttention-2 full-prefill** — `src/flash_attention.cpp:flash_attention_full(Q,K,V,causal)`.
   Tiled online-softmax over `seq×seq` (today only incremental `1×K` path). Test: ≡ naive attn <1e-4.
