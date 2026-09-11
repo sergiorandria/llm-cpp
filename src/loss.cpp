@@ -23,4 +23,19 @@ float cross_entropy_loss(const Tensor& logits, const std::vector<int>& targets) 
 float compute_loss(const Tensor& logits, const std::vector<int>& targets) {
     return cross_entropy_loss(logits, targets);
 }
+Tensor cross_entropy_backward(const Tensor& logits, const std::vector<int>& targets,
+                              float smoothing) {
+    size_t T = logits.shape[0], V = logits.shape[1];
+    Tensor d = logits.softmax(1);
+    float off = (smoothing > 0 && V > 1) ? smoothing / float(V - 1) : 0.0f;
+    for (size_t i = 0; i < T && i < targets.size(); ++i) {
+        int vocab = (int)V;
+        int tgt = ((targets[i] % vocab) + vocab) % vocab;
+        for (size_t j = 0; j < V; ++j) {
+            float y = (int)j == tgt ? (1.0f - smoothing) : off;
+            d(i, j) = (d(i, j) - y) / float(T);
+        }
+    }
+    return d;
+}
 }  // namespace llm

@@ -3,16 +3,35 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
-strategy:
-  matrix:
-    numpy: [ON, OFF]
-steps:
-  - uses: actions/checkout@v4
-  - name: Build (numpy=${{matrix.numpy}})
-    run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DUSE_NUMPY_CPP=${{matrix.numpy}} -DBUILD_TESTS=ON -DENABLE_SANITIZERS=${{matrix.numpy == 'ON' && 'ON' || 'OFF'}}
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        build_type: [Debug, Release]
+        numpy: [ON, OFF]
+    steps:
+      - uses: actions/checkout@v4
+      - name: toolchain
+        run: |
+          sudo apt-get update
+          if [ "${{ matrix.compiler }}" = "clang" ]; then sudo apt-get install -y clang; fi
+      - name: Build (J98 matrix)
+        env:
+          CC: ${{ matrix.compiler == 'clang' && 'clang' || 'gcc' }}
+          CXX: ${{ matrix.compiler == 'clang' && 'clang++' || 'g++' }}
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DUSE_NUMPY_CPP=${{ matrix.numpy }} -DBUILD_TESTS=ON
           cmake --build build -j
           ./build/llm-cpp --help
           ./build/llm-cpp || true
-          # Fuzz smoke
+          ctest --test-dir build --output-on-failure
           ./build/tests/fuzz_tokenizer 2>&1 | head -5 || true
+  openblas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libopenblas-dev
+      - run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DUSE_OPENBLAS=ON -DBUILD_TESTS=ON
+          cmake --build build -j
+          ctest --test-dir build -R "tensor|attention|matmul" --output-on-failure

@@ -61,4 +61,17 @@ Tensor MoEFFN::forward(const Tensor& x) const {
     return out;
 }
 
+float MoEFFN::aux_loss(const Tensor& x, float coef) const {
+    size_t T = x.shape[0], E = cfg_.n_experts;
+    Tensor probs = x.matmul(gate_).softmax(1);  // [T, E]
+    std::vector<float> load(E, 0.0f);
+    for (size_t t = 0; t < T; ++t)
+        for (size_t e = 0; e < E; ++e) load[e] += probs(t, e);
+    for (auto& v : load) v /= (float)T;
+    float mean = 1.0f / (float)E, cv2 = 0;
+    for (auto v : load) cv2 += (v - mean) * (v - mean);
+    cv2 /= (mean * mean * (float)E);
+    return coef * cv2;
+}
+
 }  // namespace llm

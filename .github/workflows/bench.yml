@@ -1,0 +1,27 @@
+name: bench-gate
+on: [push, pull_request]
+jobs:
+  infer-bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build bench
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF
+          cmake --build build -j4 --target bench_infer
+      - name: run (threads pinned — see BUILD.md I89)
+        run: OMP_NUM_THREADS=1 ./build/bench_infer --tokens 20 --trials 5 | tee /tmp/bench.txt
+      - name: regression gate (>10% vs dashboard baseline 352.6 tok/s)
+        run: |
+          python3 - <<'EOF'
+          import re, sys
+          txt = open('/tmp/bench.txt').read()
+          m = re.search(r'tokens/sec=([\d.]+)', txt)
+          cur = float(m.group(1))
+          base = 352.6
+          print(f"baseline={base} current={cur} ratio={cur/base:.3f}")
+          if cur < base * 0.90:
+              print("REGRESSION: >10% slower than baseline", file=sys.stderr)
+              sys.exit(1)
+          print("bench gate passed")
+          EOF

@@ -3,8 +3,12 @@
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <random>
+#include <stdexcept>
 #include <vector>
+
+#include "pool.h"
 
 #ifdef USE_NUMPY_CPP
 #include <np/linalg.hpp>
@@ -15,17 +19,27 @@
 
 namespace llm {
 
+// F51: storage dtype. I8 holds rounded int levels in idata + per-tensor scale;
+// data is empty for I8 (use dequantized() for an F32 copy). Only matmul and the
+// quantize/dequantize helpers accept I8; other ops throw with a clear message.
+enum class DType { F32, I8 };
+
 class Tensor {
    public:
-    std::vector<float> data;
-    mutable std::vector<float> grad;  // for autograd (mutable so const backward can accumulate)
+    FloatVec data;          // I90: 64B-aligned storage
+    mutable FloatVec grad;  // for autograd (mutable so const backward can accumulate)
     std::vector<size_t> shape;
     std::vector<size_t> strides;
+    DType dtype = DType::F32;
+    std::vector<int8_t> idata;  // valid iff dtype == I8
+    float i8_scale = 1.0f;      // valid iff dtype == I8
 
     Tensor() = default;
     explicit Tensor(std::vector<size_t> shape_, float fill = 0.0f);
 
     size_t numel() const;
+    // Reshape in place (total elements must match; keeps storage, recomputes strides)
+    void reshape(const std::vector<size_t>& shape_);
     size_t ndim() const {
         return shape.size();
     }
@@ -46,10 +60,13 @@ class Tensor {
 
     // Ops (CPU naive)
     Tensor matmul(const Tensor& other) const;
+    // F55: sparse GEMM skipping zeros in `other` [K,N] via CSR rows (exact; faster when sparse)
+    Tensor matmul_sparse(const Tensor& other) const;
     Tensor transpose() const;
     Tensor softmax(int dim = -1) const;
     Tensor layernorm(const Tensor* gamma = nullptr, const Tensor* beta = nullptr,
                      float eps = 1e-5f) const;
+    Tensor rmsnorm(const Tensor* weight = nullptr, float eps = 1e-5f) const;
     Tensor add(const Tensor& other) const;
     Tensor sub(const Tensor& other) const;
     Tensor mul(const Tensor& other) const;  // elementwise
@@ -66,6 +83,13 @@ class Tensor {
     static Tensor ones(std::vector<size_t> shape) {
         return Tensor(shape, 1.0f);
     }
+    // ── F51 int8 helpers ──
+    bool is_int8() const {
+        return dtype == DType::I8;
+    }
+    void require_f32(const char* op) const;  // throws std::runtime_error on I8
+    void quantize_to_int8();                 // F32 -> I8 in place (per-tensor scale)
+    Tensor dequantized() const;  // I8 -> F32 copy (throws if already F32? no: returns *this)
     void print(const std::string& name = "") const;
     std::vector<size_t> get_shape() const {
         return shape;
@@ -77,6 +101,9 @@ class Tensor {
     struct LayernormGrad;
     LayernormGrad layernorm_backward(const Tensor& grad_out, const Tensor* gamma,
                                      float eps = 1e-5f) const;
+    struct RmsnormGrad;
+    RmsnormGrad rmsnorm_backward(const Tensor& grad_out, const Tensor* weight,
+                                 float eps = 1e-5f) const;
 
 #ifdef USE_NUMPY_CPP
     // ── numpy-cpp interop ───────────────────────────────────────────────
@@ -96,6 +123,11 @@ struct Tensor::LayernormGrad {
     Tensor grad_x;
     Tensor grad_gamma;
     Tensor grad_beta;
+};
+
+struct Tensor::RmsnormGrad {
+    Tensor grad_x;
+    Tensor grad_w;
 };
 
 }  // namespace llm

@@ -1,14 +1,18 @@
 #include "llm/model.h"
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include <cmath>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <random>
 
 #include "llm/kv_cache.h"
+#include "llm/profiling.h"
 #include "llm/sampling.h"
-
 namespace llm {
 
 GPT::GPT(const Config& config)
@@ -36,13 +40,48 @@ GPT::GPT(const Config& config)
     }
     blocks_.reserve(config.n_layers);
     for (size_t i = 0; i < config.n_layers; ++i) {
-        blocks_.emplace_back(config.n_embd, config.n_heads, config.block_size);
+        TransformerConfig bcfg;
+        bcfg.use_rmsnorm = config.use_rmsnorm;  // C22
+        blocks_.emplace_back(config.n_embd, config.n_heads, config.block_size, bcfg);
     }
 }
 
+// C23: NTK-aware base + YaRN ramp. ntk: base' = theta*scaling.
+// yarn: per-dim ramp m in [0,1] between low=yarn_beta/2 and high=yarn_beta,
+// freq scale = (1-m)*1/scaling + m, plus attention scale sqrt(1+0.1*ln(scaling)).
+static float yarn_ramp(size_t dim, size_t n_embd, float beta) {
+    float d = (float)dim / (float)n_embd * beta;
+    float low = beta / 2.0f, high = beta;
+    if (d < low) return 0.0f;
+    if (d > high) return 1.0f;
+    return (d - low) / (high - low);
+}
+static Tensor rope_cfg(const Tensor& x, size_t seq_len, const Config& cfg) {
+    Tensor out = x;
+    float scaling = cfg.rope_scaling < 1.0f ? 1.0f : cfg.rope_scaling;
+    float base = cfg.rope_theta * (cfg.rope_mode == 0 ? scaling : 1.0f);
+    float attn_scale = 1.0f;
+    if (cfg.rope_mode == 1 && scaling > 1.0f)
+        attn_scale = std::sqrt(1.0f + 0.1f * std::log(scaling));
+    for (size_t pos = 0; pos < seq_len && pos < x.shape[0]; ++pos) {
+        for (size_t i = 0; i + 1 < x.shape[1]; i += 2) {
+            float freq = std::pow(base, -(float)i / x.shape[1]);
+            if (cfg.rope_mode == 1 && scaling > 1.0f) {
+                float m = yarn_ramp(i, x.shape[1], cfg.yarn_beta);
+                freq =
+                    ((1.0f - m) / scaling + m) * std::pow(cfg.rope_theta, -(float)i / x.shape[1]);
+            }
+            float angle = (float)pos * freq * cfg.yarn_alpha;
+            float cos_a = std::cos(angle), sin_a = std::sin(angle);
+            float x0 = x(pos, i), x1 = x(pos, i + 1);
+            out(pos, i) = (x0 * cos_a - x1 * sin_a) * attn_scale;
+            out(pos, i + 1) = (x0 * sin_a + x1 * cos_a) * attn_scale;
+        }
+    }
+    return out;
+}
 static Tensor rope(const Tensor& x, size_t seq_len) {
     Tensor out = x;
-    // RoPE: rotate pairs (d/2) by angle = pos / 10000^(2i/d)
     for (size_t pos = 0; pos < seq_len && pos < x.shape[0]; ++pos) {
         for (size_t i = 0; i + 1 < x.shape[1]; i += 2) {
             float angle = pos / std::pow(10000.0f, (float)i / x.shape[1]);
@@ -58,6 +97,7 @@ Tensor GPT::forward(const std::vector<int>& tokens) const {
     return forward_with_hidden(tokens).first;
 }
 std::pair<Tensor, Tensor> GPT::forward_with_hidden(const std::vector<int>& tokens) const {
+    PROFILE("forward");
     size_t T = tokens.size();
     assert(T <= config_.block_size);
     Tensor x({T, config_.n_embd}, 0.0f);
@@ -70,11 +110,11 @@ std::pair<Tensor, Tensor> GPT::forward_with_hidden(const std::vector<int>& token
             x(t, j) = wte_(tok_clamped, j) + wpe_(t, j);
         }
     }
-    if (config_.pos_encoding == PosEncoding::RoPE) x = rope(x, T);
+    if (config_.pos_encoding == PosEncoding::RoPE) x = rope_cfg(x, T, config_);
     for (auto& block : blocks_) {
         x = block.forward(x);
     }
-    x = x.layernorm(&ln_f_gamma_, &ln_f_beta_);
+    x = config_.use_rmsnorm ? x.rmsnorm(&ln_f_gamma_) : x.layernorm(&ln_f_gamma_, &ln_f_beta_);
     Tensor logits = x.matmul(lm_head_);  // [T, vocab]
     return {logits, x};
 }
@@ -114,13 +154,20 @@ void GPT::backward(const Tensor& dlogits, const std::vector<int>& tokens, const 
                           (int)config_.vocab_size;
         for (size_t j = 0; j < config_.n_embd; ++j) x(t, j) = wte_(tok_clamped, j) + wpe_(t, j);
     }
-    if (config_.pos_encoding == PosEncoding::RoPE) x = rope(x, T);
+    if (config_.pos_encoding == PosEncoding::RoPE) x = rope_cfg(x, T, config_);
     for (auto& blk : blocks_) x = blk.forward(x);
     // x is now pre-ln, hidden is layernorm(x)
-    auto ln_bwd = x.layernorm_backward(dHidden, &ln_f_gamma_);
-    Tensor dX = ln_bwd.grad_x;
-    const_cast<Tensor&>(ln_f_gamma_).add_grad(ln_bwd.grad_gamma);
-    const_cast<Tensor&>(ln_f_beta_).add_grad(ln_bwd.grad_beta);
+    Tensor dX;
+    if (config_.use_rmsnorm) {
+        auto rb = x.rmsnorm_backward(dHidden, &ln_f_gamma_);
+        dX = rb.grad_x;
+        const_cast<Tensor&>(ln_f_gamma_).add_grad(rb.grad_w);
+    } else {
+        auto ln_bwd = x.layernorm_backward(dHidden, &ln_f_gamma_);
+        dX = ln_bwd.grad_x;
+        const_cast<Tensor&>(ln_f_gamma_).add_grad(ln_bwd.grad_gamma);
+        const_cast<Tensor&>(ln_f_beta_).add_grad(ln_bwd.grad_beta);
+    }
     // Backprop through blocks in reverse
     // Need to cache intermediates per block for accurate backward; recompute forward per block
     std::vector<Tensor> block_inputs;
@@ -131,7 +178,7 @@ void GPT::backward(const Tensor& dlogits, const std::vector<int>& tokens, const 
                           (int)config_.vocab_size;
         for (size_t j = 0; j < config_.n_embd; ++j) cur(t, j) = wte_(tok_clamped, j) + wpe_(t, j);
     }
-    if (config_.pos_encoding == PosEncoding::RoPE) cur = rope(cur, T);
+    if (config_.pos_encoding == PosEncoding::RoPE) cur = rope_cfg(cur, T, config_);
     block_inputs.push_back(cur);
     for (auto& blk : blocks_) {
         cur = blk.forward(cur);
@@ -164,35 +211,36 @@ std::vector<int> GPT::generate(const std::vector<int>& prompt, size_t max_new_to
     auto incremental_step = [&](int token, size_t pos) -> std::vector<float> {
         // Build single-token embedding
         Tensor x({1, config_.n_embd}, 0.0f);
-        int tok_clamped = ((token % (int)config_.vocab_size) + (int)config_.vocab_size) % (int)config_.vocab_size;
-        size_t wpe_pos = pos % config_.block_size; // wrap for sliding window
-        for(size_t j=0;j<config_.n_embd;++j) x(0,j) = wte_(tok_clamped, j) + wpe_(wpe_pos, j);
-        // RoPE rotation for this pos
-        if(config_.pos_encoding == PosEncoding::RoPE){
-            for(size_t i=0;i+1<config_.n_embd;i+=2){
-                float angle = (float)pos / std::pow(10000.0f, (float)i / (float)config_.n_embd);
-                // Apply rope_scaling
-                angle /= config_.rope_scaling;
-                float cos_a = std::cos(angle), sin_a = std::sin(angle);
-                float x0 = x(0,i), x1 = x(0,i+1);
-                x(0,i) = x0 * cos_a - x1 * sin_a;
-                x(0,i+1) = x0 * sin_a + x1 * cos_a;
-            }
+        int tok_clamped =
+            ((token % (int)config_.vocab_size) + (int)config_.vocab_size) % (int)config_.vocab_size;
+        size_t wpe_pos = pos % config_.block_size;  // wrap for sliding window
+        for (size_t j = 0; j < config_.n_embd; ++j)
+            x(0, j) = wte_(tok_clamped, j) + wpe_(wpe_pos, j);
+        // RoPE rotation for this pos (NTK/YaRN via rope_cfg on 1×C)
+        if (config_.pos_encoding == PosEncoding::RoPE) {
+            Tensor one({1, config_.n_embd}, 0.0f);
+            for (size_t j = 0; j < config_.n_embd; ++j) one(0, j) = x(0, j);
+            // rope_cfg expects [T,C] with T=1 at position pos: shift by building
+            // a (pos+1)×C zero-padded tensor, rotating, then taking last row.
+            Tensor ext({pos + 1, config_.n_embd}, 0.0f);
+            for (size_t j = 0; j < config_.n_embd; ++j) ext(pos, j) = x(0, j);
+            Tensor rot = rope_cfg(ext, pos + 1, config_);
+            for (size_t j = 0; j < config_.n_embd; ++j) x(0, j) = rot(pos, j);
         }
         Tensor h = x;
-        for(size_t b=0;b<blocks_.size();++b){
+        for (size_t b = 0; b < blocks_.size(); ++b) {
             h = blocks_[b].forward_incremental(h, cache, b, pos);
         }
-        h = h.layernorm(&ln_f_gamma_, &ln_f_beta_);
-        Tensor logits = h.matmul(lm_head_); // [1, vocab]
+        h = config_.use_rmsnorm ? h.rmsnorm(&ln_f_gamma_) : h.layernorm(&ln_f_gamma_, &ln_f_beta_);
+        Tensor logits = h.matmul(lm_head_);  // [1, vocab]
         std::vector<float> row(config_.vocab_size);
-        for(size_t j=0;j<config_.vocab_size;++j) row[j]=logits(0,j);
+        for (size_t j = 0; j < config_.vocab_size; ++j) row[j] = logits(0, j);
         return row;
     };
     // Prefill prompt into cache and get initial last_logits
     std::vector<float> last_logits;
-    if(!prompt.empty()){
-        for(size_t pos=0;pos<prompt.size();++pos){
+    if (!prompt.empty()) {
+        for (size_t pos = 0; pos < prompt.size(); ++pos) {
             last_logits = incremental_step(prompt[pos], pos);
             cache.advance(1);
         }
@@ -252,10 +300,99 @@ std::vector<int> GPT::generate(const std::vector<int>& prompt, size_t max_new_to
     return out;
 }
 
+// E41: batched generate (per-sequence incremental; ragged prompts natural).
+std::vector<std::vector<int>> GPT::generate_batch(const std::vector<std::vector<int>>& prompts,
+                                                  size_t max_new_tokens, float temperature,
+                                                  int top_k, float top_p, float rep_penalty) const {
+    std::vector<std::vector<int>> outs;
+    outs.reserve(prompts.size());
+    for (auto& p : prompts)
+        outs.push_back(generate(p, max_new_tokens, temperature, top_k, top_p, rep_penalty));
+    return outs;
+}
+
+// E45: greedy/sampled generate recording logprob of each chosen token.
+GPT::GenOutput GPT::generate_with_logprobs(const std::vector<int>& prompt, size_t max_new_tokens,
+                                           float temperature, int top_k, float top_p) const {
+    GenOutput go;
+    go.tokens = prompt;
+    std::mt19937 rng(42);
+    KVCache cache(config_.n_layers, config_.block_size, config_.n_embd);
+    cache.clear();
+    auto incremental_step = [&](int token, size_t pos) -> std::vector<float> {
+        Tensor x({1, config_.n_embd}, 0.0f);
+        int tc =
+            ((token % (int)config_.vocab_size) + (int)config_.vocab_size) % (int)config_.vocab_size;
+        size_t wp = pos % config_.block_size;
+        for (size_t j = 0; j < config_.n_embd; ++j) x(0, j) = wte_(tc, j) + wpe_(wp, j);
+        if (config_.pos_encoding == PosEncoding::RoPE) {
+            Tensor ext({pos + 1, config_.n_embd}, 0.0f);
+            for (size_t j = 0; j < config_.n_embd; ++j) ext(pos, j) = x(0, j);
+            Tensor rot = rope_cfg(ext, pos + 1, config_);
+            for (size_t j = 0; j < config_.n_embd; ++j) x(0, j) = rot(pos, j);
+        }
+        Tensor h = x;
+        for (size_t b = 0; b < blocks_.size(); ++b)
+            h = blocks_[b].forward_incremental(h, cache, b, pos);
+        h = config_.use_rmsnorm ? h.rmsnorm(&ln_f_gamma_) : h.layernorm(&ln_f_gamma_, &ln_f_beta_);
+        Tensor logits = h.matmul(lm_head_);
+        std::vector<float> row(config_.vocab_size);
+        for (size_t j = 0; j < config_.vocab_size; ++j) row[j] = logits(0, j);
+        return row;
+    };
+    std::vector<float> last_logits;
+    if (!prompt.empty()) {
+        for (size_t pos = 0; pos < prompt.size(); ++pos) {
+            last_logits = incremental_step(prompt[pos], pos);
+            cache.advance(1);
+        }
+    } else
+        last_logits.assign(config_.vocab_size, 0.0f);
+    auto log_softmax_row = [](const std::vector<float>& r) {
+        float m = *std::max_element(r.begin(), r.end());
+        float s = 0;
+        for (auto v : r) s += std::exp(v - m);
+        float ls = m + std::log(s);
+        std::vector<float> o(r.size());
+        for (size_t i = 0; i < r.size(); ++i) o[i] = r[i] - ls;
+        return o;
+    };
+    for (size_t step = 0; step < max_new_tokens; ++step) {
+        auto lsm = log_softmax_row(last_logits);
+        int next_id = 0;
+        if (temperature == 0.0f)
+            next_id = (int)(std::max_element(last_logits.begin(), last_logits.end()) -
+                            last_logits.begin());
+        else if (top_k > 0)
+            next_id = sample_top_k_seeded(last_logits, top_k, temperature, 42 + step);
+        else if (top_p < 1.0f)
+            next_id = sample_top_p_seeded(last_logits, top_p, temperature, 42 + step);
+        else
+            next_id = sample_temperature_seeded(last_logits, temperature, 42 + step);
+        go.tokens.push_back(next_id);
+        go.logprobs.push_back(lsm[next_id]);
+        if (step + 1 >= max_new_tokens) break;
+        size_t pos = go.tokens.size() - 1;
+        last_logits = incremental_step(next_id, pos);
+        cache.advance(1);
+    }
+    return go;
+}
+
 void GPT::save(const std::string& path) const {
     save_binary(path);
     std::cout << "[save] checkpoint written to " << path << " (" << num_parameters()
               << " params)\n";
+}
+void GPT::save_binary_atomic(const std::string& path) const {
+    std::string tmp = path + ".tmp";
+    save_binary(tmp);
+    int fd = open(tmp.c_str(), O_RDONLY);
+    if (fd >= 0) {
+        fsync(fd);
+        close(fd);
+    }
+    std::rename(tmp.c_str(), path.c_str());
 }
 void GPT::save_binary(const std::string& path) const {
     // Ensure parent directory exists
@@ -410,8 +547,52 @@ void GPT::load_binary(const std::string& path) {
 
 std::vector<int> GPT::generate_streaming(const std::vector<int>& prompt, size_t max_new_tokens,
                                          std::function<void(int)> cb) const {
-    auto out = generate(prompt, max_new_tokens);
-    for (size_t i = prompt.size(); i < out.size(); ++i) cb(out[i]);
+    // E43: true per-token streaming — cb fires as each token is sampled (not at end).
+    // Uses generate_with_logprobs-equivalent incremental loop but invokes cb inline.
+    std::vector<int> out = prompt;
+    std::mt19937 rng(42);
+    KVCache cache(config_.n_layers, config_.block_size, config_.n_embd);
+    cache.clear();
+    auto incremental_step = [&](int token, size_t pos) -> std::vector<float> {
+        Tensor x({1, config_.n_embd}, 0.0f);
+        int tc =
+            ((token % (int)config_.vocab_size) + (int)config_.vocab_size) % (int)config_.vocab_size;
+        size_t wp = pos % config_.block_size;
+        for (size_t j = 0; j < config_.n_embd; ++j) x(0, j) = wte_(tc, j) + wpe_(wp, j);
+        if (config_.pos_encoding == PosEncoding::RoPE) {
+            Tensor ext({pos + 1, config_.n_embd}, 0.0f);
+            for (size_t j = 0; j < config_.n_embd; ++j) ext(pos, j) = x(0, j);
+            Tensor rot = rope_cfg(ext, pos + 1, config_);
+            for (size_t j = 0; j < config_.n_embd; ++j) x(0, j) = rot(pos, j);
+        }
+        Tensor h = x;
+        for (size_t b = 0; b < blocks_.size(); ++b)
+            h = blocks_[b].forward_incremental(h, cache, b, pos);
+        h = config_.use_rmsnorm ? h.rmsnorm(&ln_f_gamma_) : h.layernorm(&ln_f_gamma_, &ln_f_beta_);
+        Tensor logits = h.matmul(lm_head_);
+        std::vector<float> row(config_.vocab_size);
+        for (size_t j = 0; j < config_.vocab_size; ++j) row[j] = logits(0, j);
+        return row;
+    };
+    std::vector<float> last_logits;
+    if (!prompt.empty()) {
+        for (size_t pos = 0; pos < prompt.size(); ++pos) {
+            last_logits = incremental_step(prompt[pos], pos);
+            cache.advance(1);
+        }
+    } else
+        last_logits.assign(config_.vocab_size, 0.0f);
+    for (size_t step = 0; step < max_new_tokens; ++step) {
+        int next_id =
+            (int)(std::max_element(last_logits.begin(), last_logits.end()) - last_logits.begin());
+        out.push_back(next_id);
+        cb(next_id);  // stream immediately (greedy path; sampled streaming via
+                      // generate_with_logprobs loop)
+        if (step + 1 >= max_new_tokens) break;
+        size_t pos = out.size() - 1;
+        last_logits = incremental_step(next_id, pos);
+        cache.advance(1);
+    }
     return out;
 }
 void GPT::load(const std::string& path) {
@@ -468,6 +649,21 @@ void GPT::tie_weights() {
         for (size_t i = 0; i < wte_.shape[0]; ++i)
             for (size_t j = 0; j < wte_.shape[1]; ++j) lm_head_(j, i) = wte_(i, j);
     }
+}
+
+void GPT::extend_context(size_t new_block_size) {
+    if (new_block_size <= config_.block_size) return;
+    size_t C = config_.n_embd, old = config_.block_size;
+    Tensor nw({new_block_size, C}, 0.0f);
+    for (size_t p = 0; p < new_block_size; ++p) {
+        // linear interp position in old table
+        float src = (float)p * (float)(old - 1) / (float)(new_block_size - 1);
+        size_t lo = (size_t)src, hi = std::min(lo + 1, old - 1);
+        float f = src - (float)lo;
+        for (size_t j = 0; j < C; ++j) nw(p, j) = wpe_(lo, j) * (1 - f) + wpe_(hi, j) * f;
+    }
+    wpe_ = std::move(nw);
+    config_.block_size = new_block_size;
 }
 
 }  // namespace llm

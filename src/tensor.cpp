@@ -26,6 +26,16 @@ size_t Tensor::numel() const {
     return n;
 }
 
+void Tensor::reshape(const std::vector<size_t>& shape_) {
+    size_t n = 1;
+    for (auto s : shape_) n *= s;
+    size_t have = (dtype == DType::I8) ? idata.size() : data.size();
+    // Fresh (empty) tensors may take any shape; otherwise sizes must match
+    assert(have == 0 || have == n);
+    shape = shape_;
+    compute_strides();
+}
+
 void Tensor::compute_strides() {
     strides.resize(shape.size());
     if (shape.empty()) return;
@@ -35,7 +45,37 @@ void Tensor::compute_strides() {
     }
 }
 
+void Tensor::require_f32(const char* op) const {
+    if (dtype == DType::I8)
+        throw std::runtime_error(std::string(op) + " requires F32 tensor (dequantize first)");
+}
+
+void Tensor::quantize_to_int8() {
+    require_f32("quantize_to_int8");
+    float maxv = 0;
+    for (float v : data) maxv = std::max(maxv, std::abs(v));
+    i8_scale = maxv / 127.0f + 1e-8f;
+    idata.resize(data.size());
+    for (size_t i = 0; i < data.size(); ++i) {
+        float q = std::round(data[i] / i8_scale);
+        q = std::max(-127.0f, std::min(127.0f, q));
+        idata[i] = (int8_t)q;
+    }
+    data.clear();
+    data.shrink_to_fit();
+    dtype = DType::I8;
+}
+
+Tensor Tensor::dequantized() const {
+    if (dtype == DType::F32) return *this;
+    Tensor out(shape, 0.0f);
+    out.data.resize(idata.size());
+    for (size_t i = 0; i < idata.size(); ++i) out.data[i] = (float)idata[i] * i8_scale;
+    return out;
+}
+
 void Tensor::randn(float mean, float std) {
+    require_f32("randn");
 #ifdef USE_NUMPY_CPP
     randn_np(mean, std, 42);
 #else
@@ -47,6 +87,7 @@ void Tensor::randn(float mean, float std) {
 
 #ifdef USE_NUMPY_CPP
 np::ndarray<float> Tensor::to_ndarray() const {
+    require_f32("to_ndarray");
     std::vector<int> np_shape;
     np_shape.reserve(shape.size());
     for (auto s : shape) np_shape.push_back(static_cast<int>(s));
@@ -64,12 +105,27 @@ Tensor Tensor::from_ndarray(const np::ndarray<float>& arr) {
     s.reserve(arr.shape.size());
     for (auto d : arr.shape) s.push_back(static_cast<size_t>(d));
     Tensor t(s, 0.0f);
-    size_t n = std::min<size_t>(t.data.size(), arr.size());
-    std::copy(arr.data().begin(), arr.data().begin() + n, t.data.begin());
+    if (arr.is_contiguous()) {
+        // Fast path: logical order == storage order (zeros, matmul results, ...)
+        size_t n = std::min<size_t>(t.data.size(), arr.size());
+        std::copy(arr.data().begin(), arr.data().begin() + n, t.data.begin());
+        return t;
+    }
+    // Views (transpose/swapaxes/...) share storage with foreign strides — copy
+    // in LOGICAL order. (Bug fix: raw copy silently un-transposed views.)
+    if (arr.shape.size() == 2) {
+        for (size_t i = 0; i < s[0]; ++i)
+            for (size_t j = 0; j < s[1]; ++j) t(i, j) = arr(i, j);
+    } else if (arr.shape.size() == 1) {
+        for (size_t i = 0; i < s[0]; ++i) t.data[i] = arr(i);
+    } else {
+        throw std::runtime_error("from_ndarray: non-contiguous rank>2 view unsupported");
+    }
     return t;
 }
 
 Tensor Tensor::matmul_np(const Tensor& other) const {
+    require_f32("matmul_np");
     auto a = to_ndarray();
     auto b = other.to_ndarray();
     // np::linalg::matmul uses blocked GEMM + SIMD + threading
@@ -101,16 +157,51 @@ const float& Tensor::operator()(size_t i, size_t j) const {
 }
 
 Tensor Tensor::matmul(const Tensor& other) const {
+    assert(shape.size() == 2 && other.shape.size() == 2);
+    assert(shape[1] == other.shape[0]);
+    if (dtype == DType::I8 || other.dtype == DType::I8) {
+        Tensor out({shape[0], other.shape[1]}, 0.0f);
+        float sa = (dtype == DType::I8) ? i8_scale : 1.0f;
+        float sb = (other.dtype == DType::I8) ? other.i8_scale : 1.0f;
+        if (dtype == DType::I8 && other.dtype == DType::I8) {
+            // I88: true quantized MACs — int32 accumulation, single final scale.
+            // (cblas_gemm_s8u8s32 hook lives here when USE_OPENBLAS provides it.)
+            for (size_t i = 0; i < shape[0]; ++i) {
+                for (size_t j = 0; j < other.shape[1]; ++j) {
+                    int32_t acc = 0;
+                    for (size_t k = 0; k < shape[1]; ++k)
+                        acc += (int32_t)idata[i * shape[1] + k] *
+                               (int32_t)other.idata[k * other.shape[1] + j];
+                    out.data[i * out.shape[1] + j] = (float)acc * sa * sb;
+                }
+            }
+            return out;
+        }
+        // F51: folded-scale mixed path (no materialized dequant pass).
+        // ij loop with per-operand scales (F32 operand scale = 1).
+        for (size_t i = 0; i < shape[0]; ++i) {
+            for (size_t k = 0; k < shape[1]; ++k) {
+                float a = (dtype == DType::I8) ? (float)idata[i * shape[1] + k]
+                                               : data[i * strides[0] + k * strides[1]];
+                for (size_t j = 0; j < other.shape[1]; ++j) {
+                    float b = (other.dtype == DType::I8)
+                                  ? (float)other.idata[k * other.shape[1] + j]
+                                  : other.data[k * other.strides[0] + j * other.strides[1]];
+                    out.data[i * out.shape[1] + j] += a * b;
+                }
+            }
+        }
+        for (auto& v : out.data) v *= sa * sb;
+        return out;
+    }
 #ifdef USE_OPENBLAS
     assert(shape.size() == 2 && other.shape.size() == 2);
     assert(shape[1] == other.shape[0]);
     Tensor out({shape[0], other.shape[1]}, 0.0f);
     // cblas_sgemm RowMajor: C = alpha*A*B + beta*C
-    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-                (int)shape[0], (int)other.shape[1], (int)shape[1],
-                1.0f, data.data(), (int)shape[1],
-                other.data.data(), (int)other.shape[1],
-                0.0f, out.data.data(), (int)out.shape[1]);
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, (int)shape[0], (int)other.shape[1],
+                (int)shape[1], 1.0f, data.data(), (int)shape[1], other.data.data(),
+                (int)other.shape[1], 0.0f, out.data.data(), (int)out.shape[1]);
     return out;
 #elif defined(USE_NUMPY_CPP)
     // Accelerated via numpy-cpp blocked GEMM (SIMD + threading)
@@ -118,18 +209,32 @@ Tensor Tensor::matmul(const Tensor& other) const {
     assert(shape[1] == other.shape[0]);
     return matmul_np(other);
 #else
-    // OpenMP parallelized when available
+    // Naive path (USE_NUMPY_CPP=OFF): tiled i/k/j with GEMM_BLOCK_* from gemm_config.h
+#ifdef __has_include
+#if __has_include("llm/gemm_config.h")
+#include "llm/gemm_config.h"
+#endif
+#endif
+#ifndef GEMM_BLOCK_M
+#define GEMM_BLOCK_M 64
+#define GEMM_BLOCK_N 64
+#define GEMM_BLOCK_K 64
+#endif
     assert(shape.size() == 2 && other.shape.size() == 2);
     assert(shape[1] == other.shape[0]);
     Tensor out({shape[0], other.shape[1]}, 0.0f);
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-    for (size_t i = 0; i < shape[0]; ++i) {
-        for (size_t k = 0; k < shape[1]; ++k) {
-            float a = (*this)(i, k);
-            for (size_t j = 0; j < other.shape[1]; ++j) {
-                out(i, j) += a * other(k, j);
+    for (size_t ii = 0; ii < shape[0]; ii += GEMM_BLOCK_M) {
+        for (size_t kk = 0; kk < shape[1]; kk += GEMM_BLOCK_K) {
+            for (size_t i = ii; i < std::min(ii + GEMM_BLOCK_M, shape[0]); ++i) {
+                for (size_t k = kk; k < std::min(kk + GEMM_BLOCK_K, shape[1]); ++k) {
+                    float a = (*this)(i, k);
+                    for (size_t j = 0; j < other.shape[1]; ++j) {
+                        out(i, j) += a * other(k, j);
+                    }
+                }
             }
         }
     }
@@ -137,7 +242,35 @@ Tensor Tensor::matmul(const Tensor& other) const {
 #endif
 }
 
+Tensor Tensor::matmul_sparse(const Tensor& other) const {
+    require_f32("matmul_sparse");
+    other.require_f32("matmul_sparse");
+    assert(shape.size() == 2 && other.shape.size() == 2);
+    assert(shape[1] == other.shape[0]);
+    size_t M = shape[0], K = shape[1], N = other.shape[1];
+    // CSR over B rows: for each k, list of (j, val) with val != 0
+    std::vector<std::vector<std::pair<size_t, float>>> rows(K);
+    for (size_t k = 0; k < K; ++k)
+        for (size_t j = 0; j < N; ++j) {
+            float v = other.data[k * N + j];
+            if (v != 0.0f) rows[k].emplace_back(j, v);
+        }
+    Tensor out({M, N}, 0.0f);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (size_t i = 0; i < M; ++i) {
+        for (size_t k = 0; k < K; ++k) {
+            float a = data[i * K + k];
+            if (a == 0.0f) continue;
+            for (auto& jv : rows[k]) out.data[i * N + jv.first] += a * jv.second;
+        }
+    }
+    return out;
+}
+
 Tensor Tensor::transpose() const {
+    require_f32("transpose");
 #ifdef USE_NUMPY_CPP
     // numpy-cpp: view-based transpose (shared storage, SIMD strides)
     auto a = to_ndarray();
@@ -153,6 +286,7 @@ Tensor Tensor::transpose() const {
 }
 
 Tensor Tensor::softmax(int dim) const {
+    require_f32("softmax");
     Tensor out = *this;
     if (shape.size() == 2) {
 // softmax over last dim (j)
@@ -174,10 +308,7 @@ Tensor Tensor::softmax(int dim) const {
 }
 
 Tensor Tensor::layernorm(const Tensor* gamma, const Tensor* beta, float eps) const {
-#ifdef USE_NUMPY_CPP
-    // Use numpy-cpp statistics for mean/var (SIMD, parallel) then apply gamma/beta
-    // Fallback to manual per-row still vectorized; keeps epsilon handling identical
-#endif
+    require_f32("layernorm");
     assert(shape.size() == 2);
     Tensor out(shape, 0.0f);
 #ifdef _OPENMP
@@ -204,29 +335,38 @@ Tensor Tensor::layernorm(const Tensor* gamma, const Tensor* beta, float eps) con
 }
 
 Tensor Tensor::add(const Tensor& other) const {
+    require_f32("add");
     assert(shape == other.shape);
     Tensor out(shape, 0.0f);
     for (size_t i = 0; i < data.size(); ++i) out.data[i] = data[i] + other.data[i];
     return out;
 }
 Tensor Tensor::sub(const Tensor& other) const {
+    require_f32("sub");
     assert(shape == other.shape);
     Tensor out(shape, 0.0f);
     for (size_t i = 0; i < data.size(); ++i) out.data[i] = data[i] - other.data[i];
     return out;
 }
 Tensor Tensor::mul(const Tensor& other) const {
+    require_f32("mul");
     assert(shape == other.shape);
     Tensor out(shape, 0.0f);
     for (size_t i = 0; i < data.size(); ++i) out.data[i] = data[i] * other.data[i];
     return out;
 }
 Tensor Tensor::scale(float s) const {
+    if (dtype == DType::I8) {  // exact: fold into scale, levels untouched
+        Tensor out = *this;
+        out.i8_scale *= s;
+        return out;
+    }
     Tensor out(shape, 0.0f);
     for (size_t i = 0; i < data.size(); ++i) out.data[i] = data[i] * s;
     return out;
 }
 Tensor Tensor::gelu() const {
+    require_f32("gelu");
     Tensor out(shape, 0.0f);
     for (size_t i = 0; i < data.size(); ++i) {
         float x = data[i];
@@ -237,6 +377,7 @@ Tensor Tensor::gelu() const {
     return out;
 }
 Tensor Tensor::silu() const {
+    require_f32("silu");
     Tensor out(shape, 0.0f);
     for (size_t i = 0; i < data.size(); ++i) {
         float x = data[i];
@@ -245,6 +386,7 @@ Tensor Tensor::silu() const {
     return out;
 }
 Tensor Tensor::dropout(float p, std::mt19937& rng) const {
+    require_f32("dropout");
     if (p == 0.0f) return *this;
     Tensor out(shape, 0.0f);
     std::bernoulli_distribution dist(1.0 - p);
@@ -255,6 +397,7 @@ Tensor Tensor::dropout(float p, std::mt19937& rng) const {
     return out;
 }
 float Tensor::cross_entropy(const Tensor& target) const {
+    require_f32("cross_entropy");
     // naive: this = logits [N, V], target = indices [N] stored as shape [N,1] or [N]
     assert(shape.size() == 2);
     float loss = 0;
@@ -271,6 +414,7 @@ float Tensor::cross_entropy(const Tensor& target) const {
     return loss / shape[0];
 }
 size_t Tensor::argmax(size_t row) const {
+    require_f32("argmax");
     assert(row < shape[0]);
     size_t best = 0;
     float bestv = (*this)(row, 0);
@@ -377,6 +521,59 @@ Tensor::LayernormGrad Tensor::layernorm_backward(const Tensor& grad_out, const T
         }
     }
     return {grad_x, grad_gamma, grad_beta};
+}
+
+Tensor Tensor::rmsnorm(const Tensor* weight, float eps) const {
+    require_f32("rmsnorm");
+    assert(shape.size() == 2);
+    Tensor out(shape, 0.0f);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (size_t i = 0; i < shape[0]; ++i) {
+        float ms = 0;
+        for (size_t j = 0; j < shape[1]; ++j) ms += (*this)(i, j) * (*this)(i, j);
+        ms /= (float)shape[1];
+        float inv = 1.0f / std::sqrt(ms + eps);
+        for (size_t j = 0; j < shape[1]; ++j) {
+            float v = (*this)(i, j) * inv;
+            if (weight) v *= weight->data[j % weight->data.size()];
+            out(i, j) = v;
+        }
+    }
+    return out;
+}
+
+Tensor::RmsnormGrad Tensor::rmsnorm_backward(const Tensor& grad_out, const Tensor* weight,
+                                             float eps) const {
+    assert(shape.size() == 2 && grad_out.shape == shape);
+    size_t T = shape[0], C = shape[1];
+    Tensor grad_x(shape, 0.0f);
+    Tensor grad_w({C}, 0.0f);
+    for (size_t i = 0; i < T; ++i) {
+        float ms = 0;
+        for (size_t j = 0; j < C; ++j) ms += (*this)(i, j) * (*this)(i, j);
+        ms /= (float)C;
+        float inv = 1.0f / std::sqrt(ms + eps);
+        float inv3 = inv * inv * inv / (float)C;
+        // grad_w += grad_out * x_hat (x_hat = x*inv)
+        for (size_t j = 0; j < C; ++j) {
+            float x_hat = (*this)(i, j) * inv;
+            grad_w.data[j] += grad_out(i, j) * x_hat;
+        }
+        // grad_x = inv*(dy*w) - x * (sum(dy*w*x) * inv^3 / C)
+        float dot = 0;
+        for (size_t j = 0; j < C; ++j) {
+            float w = weight ? weight->data[j % weight->data.size()] : 1.0f;
+            dot += grad_out(i, j) * w * (*this)(i, j);
+        }
+        float coef = dot * inv3;
+        for (size_t j = 0; j < C; ++j) {
+            float w = weight ? weight->data[j % weight->data.size()] : 1.0f;
+            grad_x(i, j) = grad_out(i, j) * w * inv - (*this)(i, j) * coef;
+        }
+    }
+    return {grad_x, grad_w};
 }
 
 }  // namespace llm

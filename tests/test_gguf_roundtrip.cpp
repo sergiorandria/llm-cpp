@@ -1,8 +1,9 @@
-#include "llm/gguf.h"
-#include "llm/model.h"
 #include <cassert>
 #include <cstdio>
 #include <iostream>
+
+#include "llm/gguf.h"
+#include "llm/model.h"
 
 int main() {
     llm::Config cfg;
@@ -18,7 +19,7 @@ int main() {
     auto l1 = m1.forward(prompt);
     // Also test params bit-exact
     auto p1_before = m1.parameters();
-    std::vector<std::vector<float>> snapshot;
+    std::vector<llm::FloatVec> snapshot;
     snapshot.reserve(p1_before.size());
     for (auto* p : p1_before) snapshot.push_back(p->data);
 
@@ -33,7 +34,7 @@ int main() {
     {
         auto p_mut = m2.parameters();
         if (!p_mut.empty() && p_mut[0]->data.size() > (size_t)cfg.n_embd + 1) {
-            size_t idx = 1 * cfg.n_embd; // token 1, dim 0
+            size_t idx = 1 * cfg.n_embd;  // token 1, dim 0
             p_mut[0]->data[idx] += 1.0f;
         } else if (!p_mut.empty() && !p_mut[0]->data.empty()) {
             p_mut[0]->data[0] += 1.0f;
@@ -41,7 +42,8 @@ int main() {
     }
     auto l2_before = m2.forward(prompt);
     float diff_before = 0;
-    for (size_t i = 0; i < l1.data.size(); ++i) diff_before += std::abs(l1.data[i] - l2_before.data[i]);
+    for (size_t i = 0; i < l1.data.size(); ++i)
+        diff_before += std::abs(l1.data[i] - l2_before.data[i]);
     std::cout << "pre-load diff " << diff_before << " (must be >1e-3)\n";
     assert(diff_before > 1e-3 && "perturbed init should differ before load");
 
@@ -74,7 +76,7 @@ int main() {
 
     // Mismatch test: load into model with different config should fail
     llm::Config cfg_bad = cfg;
-    cfg_bad.n_embd = 32; // different
+    cfg_bad.n_embd = 32;  // different
     llm::GPT m_bad(cfg_bad);
     bool ok_bad = llm::load_gguf(m_bad, path);
     assert(!ok_bad && "load with mismatched config should fail");
@@ -92,6 +94,31 @@ int main() {
         bool ok_bad_magic = llm::load_gguf(m3, path);
         assert(!ok_bad_magic && "bad magic should fail");
         std::cout << "gguf bad magic correctly rejected\n";
+    }
+
+    // J96: Q8_0 quantized roundtrip — dequant err bound + greedy decode identical
+    {
+        const std::string qpath = "/tmp/test_gguf_q80.gguf";
+        bool saved = llm::save_gguf_quant(m1, qpath, 8);
+        assert(saved);
+        llm::GPT mq(cfg);
+        for (auto p : mq.parameters())
+            for (auto& v : p->data) v += 2.0f;  // poison so the check is real
+        bool loaded = llm::load_gguf(mq, qpath);
+        assert(loaded);
+        float md = 0;
+        auto pa = m1.parameters();
+        auto pb = mq.parameters();
+        for (size_t i = 0; i < pa.size(); ++i)
+            for (size_t j = 0; j < pa[i]->data.size(); ++j)
+                md = std::max(md, std::abs(pa[i]->data[j] - pb[i]->data[j]));
+        std::cout << "gguf q80 maxd=" << md << "\n";
+        assert(md < 0.05f);
+        auto g1 = m1.generate(prompt, 6, 0.0f);
+        auto g2 = mq.generate(prompt, 6, 0.0f);
+        assert(g1 == g2);
+        std::cout << "gguf q80 roundtrip passed\n";
+        std::remove(qpath.c_str());
     }
 
     std::remove(path.c_str());

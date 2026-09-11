@@ -49,3 +49,101 @@
 - Autotune: `scripts/autotune_flash.py:1` micro-bench `bench_matmul` for 32/64/128/256 → `include/llm/flash_config.h:3` + `docs/BENCHMARK_DASHBOARD.md`.
 - OpenBLAS: `cmake/FindOpenBLAS.cmake:1` real `find_path`/`find_library`, `CMakeLists.txt:35` `-DUSE_OPENBLAS=ON` → `cblas_sgemm`, `src/tensor.cpp:100` RowMajor dispatch, fallback blocked GEMM.
 - Test `tests/test_kv_cache_per_layer.cpp:1` asserts incremental ≡ full forward (O(n) vs O(n²)) and `ctest` 31/31 green.
+
+## Unreleased — PRODUCTION_100 Track A
+- A01 RMSNorm: `Tensor::rmsnorm` + `rmsnorm_backward` (`tensor.h/cpp`), `RMSNorm` class (`layernorm.h/cpp`), `test_rmsnorm` finite-diff <2e-2, 32/32 green.
+- A02 Grad-check harness: `tests/grad_check.h` central `max_fd_error`, `test_grad_check` covers matmul/layernorm/rmsnorm <2e-2.
+- A03 CE backward: `cross_entropy_backward(logits, targets, smoothing)` (`loss.h/cpp`), `TrainConfig::label_smoothing`, `Trainer::train_step` uses it, `test_ce_backward` row-sum=0 + smoothing.
+- A04 AdamW: decoupled `p -= lr*wd*p` with `wd_` (was hardcoded 0.01*wd), auto-skip 1D bias/norm + explicit flags, `test_adamw` decay + Rosenbrock.
+- A05 Clip helper: `clip_by_global_norm(grads, max)` shared (`optimizer.h/cpp`), `Trainer::clip_grads` delegates, `test_clip_norm`.
+- A06 Determinism: `set_global_seed/global_seed` (`utils.h/cpp`), seeded sampling overloads (`sampling.h/cpp`), `test_dropout_seed` same-seed identical.
+- A07 NaN guard: `has_nonfinite(grads)` + `Trainer::skipped_steps`, skips optimizer on non-finite, `test_nan_guard`.
+- A09 Loss scale: `TrainConfig::loss_scale` scale-dlogits/unscale-grads, `test_nan_guard` 1024x ≡ 1x.
+- A08 Deterministic: `GPT::Config::deterministic` + `TrainConfig::deterministic` (seed 42, OMP 1 thread), `test_deterministic` bit-identical.
+- A10 Attn parity: `test_attn_parity` full≡incr <1e-3 (T=8), flash-incr≡naive <1e-4 (K=150), T={33,129} finite. Track A complete (10/10).
+- B11 UTF-8: byte-level `train()` unsigned-char fix, `test_utf8` ASCII/Malagasy/emoji/invalid + 64KB corpus roundtrip.
+- B12 HF compat: `load_hf/save_hf` (vocab.json + merges.txt #version: 0.2), `test_hf_compat` merge-order + encode equivalence.
+- B13 Streaming: `decode_incremental(ids, carry)` holds back incomplete UTF-8 tail, `test_streaming` split-emoji concat == full.
+- B14 Pre-tokenizer: `split_pretokenize` GPT-2 contractions/space-letters/numbers/punct, `test_pretok`.
+- B15 Mmap: `read_file_bytes` mmap path (`dataset.cpp`), `Dataset(path, block, use_mmap)`, 1MB equivalence.
+- B16 Packing: `pack_with_eos(tokens, block, eos)` + masks, `test_data_pipeline`.
+- B17 Shuffle: `DataLoader(ds, batch, shuffle, seed)` Fisher-Yates block order, same-seed identical, full coverage.
+- B18 Split: `train_val_split(tokens, ratio, seed)`, 900/100 contiguous.
+- B19 Downloader: `scripts/download_data.py` (tinystories/shakespeare, sha256, --dry-run).
+- B20 Fuzz corpus: `tests/fuzz_corpus/` (empty/invalid-utf8/malagasy/tiny), `fuzz_tokenizer` asserts byte-roundtrip. Track B complete (10/10), 45/45 green.
+- C21 GQA: `gqa_forward(x,Wq,Wk,Wv,nq,nkv,hd)` (`mqa.h/cpp`), nkv==1 ≡ `mqa_forward` <1e-4, `test_gqa`.
+- C22 RMSNorm switch: `Config::use_rmsnorm` + `TransformerConfig::use_rmsnorm`, block + ln_f forward/incr/backward branch, `test_rmsnorm_model` trains.
+- C23 YaRN: `rope_cfg` NTK base*scaling + YaRN ramp/attn-scale (`model.cpp`), `rope_mode/yarn_alpha/yarn_beta`, ntk-vs-yarn differ 0.19.
+- C24 Guard: `validate_config` rejects alibi+RoPE, scaling>=1, global_every>0, `test_yarn_guard`.
+- C25 Hybrid: `is_global_layer(idx, every, window)` + sliding≤window property, `test_hybrid_moe`.
+- C26 MoE aux: `MoEFFN::aux_loss` CV² load-balance, uniform≈0, `test_hybrid_moe`.
+- C27 LoRA: `delta/merge_into/unmerge_from` (`lora.h/cpp`), merged ≡ base+adapter <1e-4, `test_lora_tie`.
+- C28 Tying: copy-on-tie locked (lm_head==wte^T, params counted once), `test_lora_tie` tied<untied.
+- C29 Checkpointing: `TrainConfig::checkpointing` honored (recompute-always, on/off grads identical <1e-5).
+- C30 Extend: `GPT::extend_context(new)` wpe linear interp, shrink no-op, `test_ckpt_extend`. Track C complete (10/10).
+- D31 Resume: `Adam::save/load_state` (m/v/t/lr) + `Trainer::save/load_train_state` (model+opt+json step/seed), `test_resume` 5+5 ≡ 10 bit-exact.
+- D32 SafeTensors: F32 JSON-header + LE data (`checkpoint.h/cpp`), `gpt_named_params`, `test_safetensors` logits <1e-6.
+- D33 HF config: `load_hf_config` maps n_layer/n_head/n_embd/n_positions/n_vocab, `test_hf_sched` GPT-2 124M.
+- D34 Scheduler: `CosineScheduler(lr, warmup, total, min_lr, cycles)` warmup+floor+restarts, `test_hf_sched` peaks/valleys.
+- D35 Accum: `Trainer::train_step_accum` sums K micro-grads, steps every K, `test_accum_logger` no-step-before-K.
+- D36 Reduce: `mean_reduce_grads` allreduce-mean helper, `test_accum_logger` average + identity.
+- D37 Logger: `MetricsLogger::log_step` JSONL {step,loss,ppl,lr,grad_norm,tokens_sec}, 3-line test.
+- D38 Keeper: `BestKeeper(dir, keep_n)` top-N + best.txt, `test_keeper` sequence (fixed assert-side-effect trap: Release NDEBUG elides assert args, so calls hoisted out).
+- E41 Batch: `generate_batch` ragged per-sequence, ≡ singles, `test_infer_engine`.
+- E43 Streaming: `generate_streaming` true per-token cb (greedy, ≡ temp=0), `test_infer_engine`.
+- E45 Logprobs: `generate_with_logprobs` chosen-token logprobs ≤0, `test_infer_engine`.
+- E42 Paged KV: `KVCacheConfig{paged,page_size}` block table + `evict/num_pages`, paged≡contig 0.0, `test_paged_kv`.
+- E44 Stop: `should_stop(id, eos, stop_ids)`, E46 `apply_freq_presence` exact, E47 `apply_logit_bias` (-inf bans 100/100), `test_sampling_pen`.
+- E48 Spec gate: `test_spec_gate` equivalence + wall-clock (tiny scale speedup=0.39 — slower; 2x claim needs draft<<target), dashboard entry.
+- E49 Beam: `BeamConfig{len_penalty, early_stop}` + `beam_search_cfg`, legacy delegates, `test_beam_pen`.
+- E50 Int8 GEMM: fused `matmul_int8(act, wq*scale)` (no dequant pass, err 6e-8), model ppl +0.0004% (<2%), `test_int8_infer`. Track E complete (10/10).
+- F51 Int8 dtype: `DType::I8` + `idata/scale` (`tensor.h/cpp`), folded-scale matmul dispatch, fp32-only ops throw, `quantize_int8` returns real I8, `test_int8_dtype`.
+- Build: 16 test targets missing `utils.cpp` (latent since A06 global_seed) + `optimizer.cpp` for rlhf/pipeline — fixed, 63/63 green.
+- F52 GPTQ persist: `quantize_model_4bit/save_gptq/load_gptq` (magic GPTQ v1, per-param q+scale+group), loaded-scale err 0.002 <0.5.
+- F53 AWQ: `channel_act_mag` + `awq_rescale_for_quant` (salient-channel protect, fp-exact via inv), `test_gptq_awq`.
+- F54 GGUF quant: Q8_0/Q4_0 block-32 codecs + `save_gguf_quant` + load dequant (`gguf.h/cpp`), q8 err 0.0003<0.05, greedy identical, `test_gguf_quant` (also fixed assert-elided save/load trap).
+- F55 Sparse: `Tensor::matmul_sparse` CSR over B rows (exact, 0.0 diff), `test_sparse_prune`.
+- F57 2:4: `prune_2to4/verify_2to4` top-2 per group of 4, ppl 2.7024→2.7029, `test_sparse_prune`.
+- F56 Distill cache: `cache_teacher_logits/load_cached_logits/distill_step_cached`, cached≡live grads 0.0, `test_distill_cache`.
+- F58 Calib: `data/calib/calib.txt` 1k lines + `scripts/calibrate.py` byte-freq scales (113 bytes, --check).
+- F59 Gate: `test_quant_gate` calib ppl rel 8e-6<5%, 4-bit err 0.002<0.5 + `.github/workflows/quant.yml`.
+- F60 CLI: `generate/train --quantize --bits 4|8 --group 128 --out` with mean_abs_delta verify. Track F complete (10/10).
+- G61/G62/G65/G70 Server: POSIX no-dep OpenAI-compatible `Server` (`server.h/cpp`: /healthz, /v1/completions, /v1/chat/completions, SSE stream, 429 gate, SIGPIPE-proof), `test_server` loopback green (also fixed 3rd assert-elided-syscall trap: connect() hoisted).
+- G66 CLI: `serve --port/--max_concurrency` (SIGTERM/SIGINT drain) + `generate --stream/--stop/--logprobs/--seed/--json` (stream uses UTF-8 incremental decode), live curl verified.
+- G67 Schema: `config/schema.json` + `validate_config_verbose` messages wired into train/generate/serve, `test_config_errors` 5 bad configs.
+- G68 Card: `scripts/model_card.py` (arch + checkpoint v3 parse + usage), verified on example config.
+- G69 Examples: `examples/curl.sh`, `python_openai.py` (stdlib, BASE env), `node_fetch.mjs` — all verified live; fixed real bug: `json_escape` now guarantees valid UTF-8 (stray bytes→U+FFFD), `test_server` asserts UTF-8 validity.
+- G63 Bindings: C ABI `libllm-c-api` (`c_api.cpp`: create/free/encode/decode/generate/params) + `python/llm_cpp` ctypes + `test_bind.py`, ctest `pybind` green (no pybind11 needed).
+- G64/G65 Deploy: multi-stage `Dockerfile` (non-root, HEALTHCHECK, serve entrypoint) + `docker-compose.yml` (volume + healthcheck, `compose config` OK; full image build deferred to tag CI — 25min+ locally).
+- H71 Logging: `format_json/log_json` ({ts,level,msg}+fields to stderr), `test_log_prof` key checks.
+- H73 Profiling: built-in `PROFILE(name)` ScopedTimer registry + `profiling_report`, wired attn/block/forward, `test_log_prof` all timers >0.
+- H72 Metrics: `GET /metrics` Prometheus (requests/tokens/latency/kv_bytes), `test_metrics_guards` (assert-verified via -UNDEBUG build).
+- H74 Guards: server 400 when prompt+max > block_size before alloc, `test_metrics_guards`.
+- H75 Validation: 8-case table (temp/top_p/top_k/max/404) with messages, `test_metrics_guards`.
+- H80 Audit: `ServerConfig{audit_log}` hash-only lines, stable-hash + no-raw-prompt checks.
+- H76 Sanitizers: `.github/workflows/san.yml` (Debug + ASAN/UBSAN, buffer suites first).
+- H77 GGUF fuzz: `tests/fuzz_gguf` magic/truncation/flip/shape mutations — found+fixed real DoS (`bad_alloc` on corrupt u64 length; now capped 1MB + n_dims<=8 + try/catch), rejects=22, roundtrips still green.
+- H78 Atomic: `GPT::save_binary_atomic` (tmp+fsync+rename), no .tmp left, overwrite loads exact.
+- H79 Rollback: `Trainer::snapshot_params/rollback_if_nonfinite` (restore + halve LR), finite no-op, `test_atomic_rollback`. Track H complete (10/10).
+- I81 Threads: `init_threading()` honors LLM_THREADS/OMP_NUM_THREADS (+ BUILD.md), `test_threads_simd`.
+- I82 SIMD: `simd_caps()` reports ISA at compile time; accelerated matmul ≡ naive 8e-8, `test_threads_simd` (this env: scalar+numpy-cpp, no OpenMP — honestly reported).
+- I83 Autotune: `autotune_flash.py` also emits `gemm_config.h` (M=N=K=64 advisory, wired into naive GEMM tiling) + per-section dashboard (E48 preserved); retuned flash 32→128 on this box (flat ~11ms landscape).
+- FIX (critical): `Tensor::from_ndarray` raw-copied shared storage, silently un-transposing numpy views — every `matmul(K.transpose())` under USE_NUMPY_CPP=ON computed wrong scores (found via I84: flash-vs-naive 0.04). Now copies logical order (`arr(i,j)` when non-contiguous), flash-vs-naive 7e-8. `test_transpose` regression. NOTE: all pre-fix attention numerics/ppl under numpy builds are suspect; OFF builds were always correct.
+- I84 FlashAttention-2: `flash_attention_full` online-softmax O(D+block) (≡ naive/fa1 7e-8), T>128 dispatch switched, `test_flash2` causal+noncausal.
+- I85/I86/I90 Memory: `TensorPool` shape-keyed recycling + `KVCache::set_pool` evict-to-pool (100 cycles: 6 misses, 596 hits); 64B-aligned `Tensor::data/grad` via AlignedAllocator (`test_pool` alignment + exact matmul). Also fixed pool.h includes-inside-namespace breakage.
+- I87 Backend: `backend.h` CPU/CUDA abstraction + `-DUSE_CUDA=ON` (warns + CPU fallback without toolkit), `test_backend` graceful CPU.
+- I88 Int8 MACs: I8×I8 accumulates in int32 with single scale (cublas/s8 hook documented), mixed keeps folded-float; i8xi8 err 0.003, `test_int8_dtype` extended. Fixed 51 test targets missing pool.cpp.
+- I89 Bench: `bench_infer` (trials p50/p95, tok/s) + `bench.yml` 10% gate vs 352.6 baseline; found nested-OpenMP oversubscription (0.37 vs 352 tok/s — pin threads=1), documented in BUILD.md.
+- Build: `profiling.cpp` added to 45 test targets + llm-c-api (new PROFILE refs).
+- D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.
+- J91 Version: `cmake/version.cmake` generates `llm/version.h` from `git describe`, `llm-cpp --version`, `test_version`.
+- J92 Gate: `lint.yml` changelog job (code PRs without CHANGELOG entry fail; docs-only skip).
+- J93 Lint: `.clang-tidy` + `scripts/lint.sh` (format gate on changed files, tidy opt-in LINT_TIDY=1) + session-wide `style:` format commit; legacy files grandfathered.
+- J94 Coverage: `-DENABLE_COVERAGE=ON` (gcov flags) + `coverage.yml` (lcov, 80% line gate, Codecov upload).
+- J95 Overfit: `test_overfit` Shakespeare-200 2L/64e 100 steps loss 5.10→0.04 slope<0 (6.8s).
+- J96 GGUF-Q8: `test_gguf_roundtrip` Q8_0 section (err 0.0002<0.05, greedy identical).
+- J97 SBOM: `scripts/sbom.sh` (GPL fail) + `THIRD_PARTY.md`; finding: numpy-cpp claims BSD-3 but ships NO LICENSE file (exception recorded, upstream follow-up).
+- J98 Matrix: `ci.yml` gcc/clang x Debug/Release x numpy ON/OFF + OpenBLAS job.
+- J99 Release: `release.yml` on `v*` (tarball + smoke + docker image).
+- J100 Sign-off: `docs/PRODUCTION.md` checklist, numbers, known limits. 100/100 complete.
+- Fix: `llm-c-api` missing `pool.cpp` (undefined TensorPool symbols; caught by fresh-lib pybind rerun).

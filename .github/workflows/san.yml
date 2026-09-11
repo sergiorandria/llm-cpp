@@ -1,0 +1,15 @@
+name: sanitizers
+on: [push, pull_request]
+jobs:
+  asan-ubsan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: configure with sanitizers
+        run: cmake -B build_san -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZERS=ON -DBUILD_TESTS=ON
+      - name: build
+        run: cmake --build build_san -j4
+      - name: ctest (buffer-touching suites first)
+        run: |
+          ctest --test-dir build_san -R "gguf|tokenizer|speculative|utf8|fuzz" --output-on-failure
+          ctest --test-dir build_san --output-on-failure

@@ -1,0 +1,31 @@
+name: lint-gates
+on: [pull_request]
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: J92 changelog gate (skip for docs-only PRs)
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          files=$(git diff --name-only "$base"...HEAD)
+          echo "$files"
+          if echo "$files" | grep -qvE '^(docs/|README\.md|examples/)'; then
+            echo "$files" | grep -q '^docs/CHANGELOG.md' \
+              && echo "changelog updated" \
+              || { echo "FAIL: code changed without docs/CHANGELOG.md entry" >&2; exit 1; }
+          else
+            echo "docs-only change, gate skipped"
+          fi
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: J93 clang-format + clang-tidy
+        env:
+          LINT_TIDY: 1
+        run: bash scripts/lint.sh "origin/${{ github.base_ref }}"
