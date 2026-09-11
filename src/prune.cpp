@@ -44,4 +44,35 @@ float sparsity(const GPT& model) {
     return float(zeros) / float(total);
 }
 
+void prune_2to4(GPT& model) {
+    for (auto* p : model.parameters()) {
+        if (p->shape.size() != 2) continue;  // 2D weights only
+        size_t n = p->data.size();
+        for (size_t g = 0; g + 4 <= n; g += 4) {
+            // find 2 smallest |.| in group
+            size_t i1 = g, i2 = g + 1;
+            if (std::abs(p->data[i2]) < std::abs(p->data[i1])) std::swap(i1, i2);
+            for (size_t k = g + 2; k < g + 4; ++k) {
+                if (std::abs(p->data[k]) < std::abs(p->data[i1])) { i2 = i1; i1 = k; }
+                else if (std::abs(p->data[k]) < std::abs(p->data[i2])) { i2 = k; }
+            }
+            p->data[i1] = 0.0f;
+            p->data[i2] = 0.0f;
+        }
+    }
+}
+
+bool verify_2to4(const GPT& model) {
+    for (auto* p : model.parameters()) {
+        if (p->shape.size() != 2) continue;
+        size_t n = p->data.size();
+        for (size_t g = 0; g + 4 <= n; g += 4) {
+            int zeros = 0;
+            for (size_t k = g; k < g + 4; ++k) if (p->data[k] == 0.0f) ++zeros;
+            if (zeros != 2) return false;
+        }
+    }
+    return true;
+}
+
 }  // namespace llm

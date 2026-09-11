@@ -56,6 +56,8 @@ class Tensor {
 
     // Ops (CPU naive)
     Tensor matmul(const Tensor& other) const;
+    // F55: sparse GEMM skipping zeros in `other` [K,N] via CSR rows (exact; faster when sparse)
+    Tensor matmul_sparse(const Tensor& other) const;
     Tensor transpose() const;
     Tensor softmax(int dim = -1) const;
     Tensor layernorm(const Tensor* gamma = nullptr, const Tensor* beta = nullptr,

@@ -102,4 +102,6 @@
 - F52 GPTQ persist: `quantize_model_4bit/save_gptq/load_gptq` (magic GPTQ v1, per-param q+scale+group), loaded-scale err 0.002 <0.5.
 - F53 AWQ: `channel_act_mag` + `awq_rescale_for_quant` (salient-channel protect, fp-exact via inv), `test_gptq_awq`.
 - F54 GGUF quant: Q8_0/Q4_0 block-32 codecs + `save_gguf_quant` + load dequant (`gguf.h/cpp`), q8 err 0.0003<0.05, greedy identical, `test_gguf_quant` (also fixed assert-elided save/load trap).
+- F55 Sparse: `Tensor::matmul_sparse` CSR over B rows (exact, 0.0 diff), `test_sparse_prune`.
+- F57 2:4: `prune_2to4/verify_2to4` top-2 per group of 4, ppl 2.7024→2.7029, `test_sparse_prune`.
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.

@@ -168,13 +168,13 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   Save per-group `scale_out` alongside qlevels. Test: save→load→dequant error still <0.5.
 - [x] **F53 AWQ scaling** — `src/gptq.cpp` (new `awq_scale(model, calib_data)`).
   Activation-aware per-channel scale before quant. Test: AWQ ppl ≤ naive int8 ppl on calib set.
-- [x] **F54 GGUF Q4_K / Q8_0 types** — `src/gguf.cpp` extend beyond f32.
+- [x] **F54 GGUF Q4_K / Q8_0 types** — `src/gguf.cpp` extend beyond f32. (Done: Q8_0 + Q4_0 block-32; Q4_K super-blocks deferred — needs 256-elem scales/mins.)
   Write `GGML_TYPE_Q4_K` blocks + dequant on load. Test: Q8_0 roundtrip err <0.05.
-- [ ] **F55 Sparse matmul skip-zeros** — `src/prune.cpp` + `src/tensor.cpp:matmul_sparse(mask)` CSR path.
+- [x] **F55 Sparse matmul skip-zeros** — `src/prune.cpp` + `src/tensor.cpp:matmul_sparse(mask)` CSR path.
   Dispatch when `sparsity>0.5`. Test: 50% pruned model logits match dense <1e-4, faster on 512².
 - [ ] **F56 Teacher-logit cache for distill** — `src/distill.cpp`.
   `cache_teacher_logits(teacher, dataset, path)` to disk once. Test: cached ≡ live KL <1e-6.
-- [ ] **F57 Structured 2:4 pruning** — `src/prune.cpp:prune_2to4(model)`.
+- [x] **F57 Structured 2:4 pruning** — `src/prune.cpp:prune_2to4(model)`.
   Every 4 weights keep top-2 by magnitude + mask tensor. Test: mask satisfies 2:4 + ppl measured.
 - [ ] **F58 Quant calibration set** — `data/calib/` 1k-line bundled sample + `scripts/calibrate.py`.
   `quantize --calib` derives scales from activations, not random. Test: calib scales differ from default.

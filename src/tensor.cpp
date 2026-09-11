@@ -189,6 +189,33 @@ Tensor Tensor::matmul(const Tensor& other) const {
 #endif
 }
 
+Tensor Tensor::matmul_sparse(const Tensor& other) const {
+    require_f32("matmul_sparse");
+    other.require_f32("matmul_sparse");
+    assert(shape.size() == 2 && other.shape.size() == 2);
+    assert(shape[1] == other.shape[0]);
+    size_t M = shape[0], K = shape[1], N = other.shape[1];
+    // CSR over B rows: for each k, list of (j, val) with val != 0
+    std::vector<std::vector<std::pair<size_t, float>>> rows(K);
+    for (size_t k = 0; k < K; ++k)
+        for (size_t j = 0; j < N; ++j) {
+            float v = other.data[k * N + j];
+            if (v != 0.0f) rows[k].emplace_back(j, v);
+        }
+    Tensor out({M, N}, 0.0f);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (size_t i = 0; i < M; ++i) {
+        for (size_t k = 0; k < K; ++k) {
+            float a = data[i * K + k];
+            if (a == 0.0f) continue;
+            for (auto& jv : rows[k]) out.data[i * N + jv.first] += a * jv.second;
+        }
+    }
+    return out;
+}
+
 Tensor Tensor::transpose() const {
     require_f32("transpose");
 #ifdef USE_NUMPY_CPP
