@@ -11,6 +11,9 @@ namespace llm {
 static constexpr uint32_t GGUF_MAGIC = 0x46554747u; // "GGUF" little-endian
 static constexpr uint32_t GGUF_VERSION = 3;
 static constexpr uint32_t GGUF_DTYPE_F32 = 0;
+static constexpr uint32_t GGUF_DTYPE_Q4_0 = 2; // ggml type id, block 32 nibbles + F32 scale
+static constexpr uint32_t GGUF_DTYPE_Q8_0 = 8; // ggml type id, block 32 int8 + F32 scale
+static constexpr size_t GGUF_QBLK = 32;
 static constexpr size_t GGUF_ALIGN = 32;
 static constexpr uint32_t GGUF_TYPE_STRING = 8;
 
@@ -41,6 +44,94 @@ static bool read_string(std::ifstream& in, std::string& s) {
         in.read(s.data(), len);
         if (in.fail()) return false;
     }
+    return true;
+}
+
+// ── F54 block codecs ──
+void encode_q80_block(const float* x, float& scale_out, int8_t* q_out) {
+    float mx = 0;
+    for (size_t i = 0; i < GGUF_QBLK; ++i) mx = std::max(mx, std::abs(x[i]));
+    scale_out = mx / 127.0f + 1e-8f;
+    for (size_t i = 0; i < GGUF_QBLK; ++i) {
+        float q = std::round(x[i] / scale_out);
+        q_out[i] = (int8_t)std::max(-127.0f, std::min(127.0f, q));
+    }
+}
+void decode_q80_block(float scale, const int8_t* q, float* out) {
+    for (size_t i = 0; i < GGUF_QBLK; ++i) out[i] = (float)q[i] * scale;
+}
+void encode_q40_block(const float* x, float& scale_out, uint8_t* packed_out) {
+    float mx = 0;
+    for (size_t i = 0; i < GGUF_QBLK; ++i) mx = std::max(mx, std::abs(x[i]));
+    scale_out = mx / 7.0f + 1e-8f;
+    for (size_t i = 0; i < GGUF_QBLK; i += 2) {
+        float a = std::round(x[i] / scale_out), b = std::round(x[i + 1] / scale_out);
+        a = std::max(-8.0f, std::min(7.0f, a));
+        b = std::max(-8.0f, std::min(7.0f, b));
+        packed_out[i / 2] = (uint8_t)(((int)(b + 8) << 4) | ((int)(a + 8) & 0xF));
+    }
+}
+void decode_q40_block(float scale, const uint8_t* packed, float* out) {
+    for (size_t i = 0; i < GGUF_QBLK; i += 2) {
+        out[i] = (float)(((int)(packed[i / 2] & 0xF)) - 8) * scale;
+        out[i + 1] = (float)(((int)(packed[i / 2] >> 4) & 0xF) - 8) * scale;
+    }
+}
+
+// Encoded size of a tensor with n floats under dtype tag
+static size_t gguf_nbytes(size_t n, uint32_t dtype) {
+    if (dtype == GGUF_DTYPE_Q8_0) return (n / GGUF_QBLK) * (4 + GGUF_QBLK);
+    if (dtype == GGUF_DTYPE_Q4_0) return (n / GGUF_QBLK) * (4 + GGUF_QBLK / 2);
+    return n * sizeof(float);
+}
+
+static void write_encoded(std::ofstream& out, const Tensor& t, uint32_t dtype) {
+    size_t n = t.data.size();
+    if (dtype == GGUF_DTYPE_F32) { out.write((char*)t.data.data(), n * sizeof(float)); return; }
+    std::vector<float> padded = t.data;
+    while (padded.size() % GGUF_QBLK) padded.push_back(0.0f);
+    if (dtype == GGUF_DTYPE_Q8_0) {
+        for (size_t b = 0; b < padded.size(); b += GGUF_QBLK) {
+            float sc; int8_t q[GGUF_QBLK];
+            encode_q80_block(padded.data() + b, sc, q);
+            out.write((char*)&sc, 4);
+            out.write((char*)q, GGUF_QBLK);
+        }
+    } else { // Q4_0
+        for (size_t b = 0; b < padded.size(); b += GGUF_QBLK) {
+            float sc; uint8_t p[GGUF_QBLK / 2];
+            encode_q40_block(padded.data() + b, sc, p);
+            out.write((char*)&sc, 4);
+            out.write((char*)p, GGUF_QBLK / 2);
+        }
+    }
+}
+
+static bool read_decoded(std::ifstream& in, Tensor& t, uint32_t dtype, size_t abs_offset) {
+    in.seekg((std::streampos)abs_offset, std::ios::beg);
+    if (in.fail()) return false;
+    size_t n = t.data.size();
+    if (dtype == GGUF_DTYPE_F32) {
+        in.read((char*)t.data.data(), n * sizeof(float));
+        return (size_t)in.gcount() == n * sizeof(float);
+    }
+    size_t padded = n + ((GGUF_QBLK - n % GGUF_QBLK) % GGUF_QBLK);
+    std::vector<float> buf(padded);
+    for (size_t b = 0; b < padded; b += GGUF_QBLK) {
+        float sc = 0;
+        in.read((char*)&sc, 4);
+        if (dtype == GGUF_DTYPE_Q8_0) {
+            int8_t q[GGUF_QBLK];
+            in.read((char*)q, GGUF_QBLK);
+            decode_q80_block(sc, q, buf.data() + b);
+        } else {
+            uint8_t p[GGUF_QBLK / 2];
+            in.read((char*)p, GGUF_QBLK / 2);
+            decode_q40_block(sc, p, buf.data() + b);
+        }
+        if (in.fail()) return false;
+    }
+    for (size_t i = 0; i < n; ++i) t.data[i] = buf[i];
     return true;
 }
 
@@ -185,6 +276,64 @@ bool save_gguf(const GPT& model, const std::string& path) {
     return true;
 }
 
+bool save_gguf_quant(const GPT& model, const std::string& path, int qtype) {
+    uint32_t dtype = GGUF_DTYPE_F32;
+    if (qtype == 8) dtype = GGUF_DTYPE_Q8_0;
+    else if (qtype == 4) dtype = GGUF_DTYPE_Q4_0;
+    {
+        size_t slash = path.find_last_of("/\\");
+        if (slash != std::string::npos) std::filesystem::create_directories(path.substr(0, slash));
+    }
+    std::ofstream out(path, std::ios::binary);
+    if (!out) { std::cerr << "[gguf] save_quant: cannot open " << path << "\n"; return false; }
+    auto params = model.parameters();
+    size_t tensor_count = params.size();
+    size_t vocab_size = tensor_count >= 1 ? params[0]->shape[0] : 0;
+    size_t n_embd = tensor_count >= 1 ? params[0]->shape[1] : 0;
+    size_t block_size = tensor_count >= 2 ? params[1]->shape[0] : 0;
+    struct KV { std::string key, value; };
+    std::vector<KV> kvs = {{"general.architecture", "llm"}, {"general.name", "llm-cpp"},
+        {"llm.vocab_size", std::to_string(vocab_size)}, {"llm.n_embd", std::to_string(n_embd)},
+        {"llm.block_size", std::to_string(block_size)},
+        {"llm.tensor_count", std::to_string(tensor_count)},
+        {"llm.quant_type", std::to_string(qtype)}};
+    write_u32(out, GGUF_MAGIC);
+    write_u32(out, GGUF_VERSION);
+    write_u64(out, (uint64_t)tensor_count);
+    write_u64(out, (uint64_t)kvs.size());
+    for (auto& kv : kvs) { write_string(out, kv.key); write_u32(out, GGUF_TYPE_STRING); write_string(out, kv.value); }
+    struct Info { std::string name; std::vector<uint64_t> dims; uint64_t offset = 0, nbytes = 0; };
+    std::vector<Info> infos;
+    for (size_t i = 0; i < tensor_count; ++i) {
+        Info info;
+        info.name = "tensor_" + std::to_string(i);
+        for (auto d : params[i]->shape) info.dims.push_back((uint64_t)d);
+        size_t padded = params[i]->data.size() + ((GGUF_QBLK - params[i]->data.size() % GGUF_QBLK) % GGUF_QBLK);
+        info.nbytes = (dtype == GGUF_DTYPE_F32) ? params[i]->data.size() * sizeof(float) : gguf_nbytes(padded, dtype);
+        infos.push_back(std::move(info));
+    }
+    size_t cur = 0;
+    for (auto& info : infos) { cur = align_offset(cur, GGUF_ALIGN); info.offset = cur; cur += info.nbytes; }
+    for (auto& info : infos) {
+        write_string(out, info.name);
+        write_u32(out, (uint32_t)info.dims.size());
+        for (auto d : info.dims) write_u64(out, d);
+        write_u32(out, dtype);
+        write_u64(out, info.offset);
+    }
+    size_t hs = align_offset((size_t)out.tellp(), GGUF_ALIGN);
+    for (size_t i = (size_t)out.tellp(); i < hs; ++i) out.put(0);
+    size_t data_start = (size_t)out.tellp();
+    for (size_t i = 0; i < infos.size(); ++i) {
+        size_t target = data_start + infos[i].offset;
+        for (size_t c = (size_t)out.tellp(); c < target; ++c) out.put(0);
+        write_encoded(out, *params[i], dtype);
+    }
+    out.flush();
+    std::cout << "[gguf] save_quant " << path << " qtype=" << qtype << " tensors " << tensor_count << "\n";
+    return (bool)out;
+}
+
 bool load_gguf(GPT& model, const std::string& path) {
     std::ifstream in(path, std::ios::binary);
     if (!in) {
@@ -266,7 +415,7 @@ bool load_gguf(GPT& model, const std::string& path) {
             std::cerr << "[gguf] load: dtype/offset read failed\n";
             return false;
         }
-        if (info.dtype != GGUF_DTYPE_F32) {
+        if (info.dtype != GGUF_DTYPE_F32 && info.dtype != GGUF_DTYPE_Q8_0 && info.dtype != GGUF_DTYPE_Q4_0) {
             std::cerr << "[gguf] load: unsupported dtype " << info.dtype << "\n";
             return false;
         }
@@ -294,31 +443,21 @@ bool load_gguf(GPT& model, const std::string& path) {
                 return false;
             }
         }
-        // Validate offset + nbytes within file
-        size_t nbytes = p->data.size() * sizeof(float);
-        // We'll check later by seeking, but ensure offset+ nbytes doesn't overflow
-        if (info.offset + nbytes < info.offset) {
+        // I8 model weights are not GGUF-loadable (dequantize first); reject clearly
+        if (p->is_int8()) { std::cerr << "[gguf] load: model tensor " << info.name << " is int8\n"; return false; }
+        if (info.offset + gguf_nbytes(p->data.size(), GGUF_DTYPE_F32) < info.offset && info.dtype == GGUF_DTYPE_F32) {
             std::cerr << "[gguf] load: offset overflow\n";
             return false;
         }
     }
 
-    // Now populate tensors
+    // Now populate tensors (dequantizing Q8_0/Q4_0 on the fly)
     for (size_t i = 0; i < infos.size(); ++i) {
         const auto& info = infos[i];
         auto* p = mutable_params[i];
-        size_t nbytes = p->data.size() * sizeof(float);
         size_t abs_offset = data_start + (size_t)info.offset;
-        in.seekg((std::streampos)abs_offset, std::ios::beg);
-        if (in.fail()) {
-            std::cerr << "[gguf] load: seek failed for " << info.name << " offset " << abs_offset
-                      << "\n";
-            return false;
-        }
-        in.read((char*)p->data.data(), nbytes);
-        if ((size_t)in.gcount() != nbytes || in.fail()) {
-            std::cerr << "[gguf] load: data read failed for " << info.name << " expected " << nbytes
-                      << " got " << in.gcount() << "\n";
+        if (!read_decoded(in, *p, info.dtype, abs_offset)) {
+            std::cerr << "[gguf] load: data read failed for " << info.name << "\n";
             return false;
         }
         // Ensure strides recomputed if shape changed (they didn't, but recompute for safety)

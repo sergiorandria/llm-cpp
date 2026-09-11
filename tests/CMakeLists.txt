@@ -142,3 +142,5 @@ add_executable(test_int8_dtype test_int8_dtype.cpp ../src/quantize.cpp ../src/te
 add_test(NAME int8_dtype COMMAND test_int8_dtype)
 add_executable(test_gptq_awq test_gptq_awq.cpp ../src/gptq.cpp ../src/checkpoint.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp)
 add_test(NAME gptq_awq COMMAND test_gptq_awq)
+add_executable(test_gguf_quant test_gguf_quant.cpp ../src/gguf.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp)
+add_test(NAME gguf_quant COMMAND test_gguf_quant)

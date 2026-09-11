@@ -101,4 +101,5 @@
 - Build: 16 test targets missing `utils.cpp` (latent since A06 global_seed) + `optimizer.cpp` for rlhf/pipeline — fixed, 63/63 green.
 - F52 GPTQ persist: `quantize_model_4bit/save_gptq/load_gptq` (magic GPTQ v1, per-param q+scale+group), loaded-scale err 0.002 <0.5.
 - F53 AWQ: `channel_act_mag` + `awq_rescale_for_quant` (salient-channel protect, fp-exact via inv), `test_gptq_awq`.
+- F54 GGUF quant: Q8_0/Q4_0 block-32 codecs + `save_gguf_quant` + load dequant (`gguf.h/cpp`), q8 err 0.0003<0.05, greedy identical, `test_gguf_quant` (also fixed assert-elided save/load trap).
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.
