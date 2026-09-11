@@ -120,3 +120,5 @@ add_executable(test_resume test_resume.cpp ../src/model.cpp ../src/attention.cpp
 add_test(NAME resume COMMAND test_resume)
 add_executable(test_safetensors test_safetensors.cpp ../src/checkpoint.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp)
 add_test(NAME safetensors COMMAND test_safetensors)
+add_executable(test_hf_sched test_hf_sched.cpp ../src/config.cpp ../src/scheduler.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp)
+add_test(NAME hf_sched COMMAND test_hf_sched)

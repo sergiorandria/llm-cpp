@@ -83,3 +83,5 @@
 - C30 Extend: `GPT::extend_context(new)` wpe linear interp, shrink no-op, `test_ckpt_extend`. Track C complete (10/10).
 - D31 Resume: `Adam::save/load_state` (m/v/t/lr) + `Trainer::save/load_train_state` (model+opt+json step/seed), `test_resume` 5+5 ≡ 10 bit-exact.
 - D32 SafeTensors: F32 JSON-header + LE data (`checkpoint.h/cpp`), `gpt_named_params`, `test_safetensors` logits <1e-6.
+- D33 HF config: `load_hf_config` maps n_layer/n_head/n_embd/n_positions/n_vocab, `test_hf_sched` GPT-2 124M.
+- D34 Scheduler: `CosineScheduler(lr, warmup, total, min_lr, cycles)` warmup+floor+restarts, `test_hf_sched` peaks/valleys.

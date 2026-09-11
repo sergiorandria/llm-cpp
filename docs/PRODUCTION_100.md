@@ -116,9 +116,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 - [x] **D32 SafeTensors I/O** — `src/checkpoint.cpp` (+ `safetensors.cpp` new if >200 LOC).
   `save_safetensors`/`load_safetensors` (JSON header + little-endian f32).
   Test: safetensors→load→logits match binary v3 <1e-6.
-- [ ] **D33 HF `config.json` compat** — `src/config.cpp`.
+- [x] **D33 HF `config.json` compat** — `src/config.cpp`.
   `load_hf_config(dir)` maps `n_layer/n_head/n_embd` → our `Config`. Test on GPT-2 124M shape.
-- [ ] **D34 Scheduler warmup+cosine+restarts** — `src/scheduler.cpp`.
+- [x] **D34 Scheduler warmup+cosine+restarts** — `src/scheduler.cpp`.
   `CosineScheduler{warmup_steps, total_steps, min_lr, restarts}`. Test: lr curve matches formula.
 - [ ] **D35 Gradient accumulation** — `src/trainer.cpp:TrainConfig{grad_accum_steps=4}`.
   Accumulate `grad` over K micro-batches before `optimizer.step()`.
