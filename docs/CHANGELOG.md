@@ -81,3 +81,4 @@
 - C28 Tying: copy-on-tie locked (lm_head==wte^T, params counted once), `test_lora_tie` tied<untied.
 - C29 Checkpointing: `TrainConfig::checkpointing` honored (recompute-always, on/off grads identical <1e-5).
 - C30 Extend: `GPT::extend_context(new)` wpe linear interp, shrink no-op, `test_ckpt_extend`. Track C complete (10/10).
+- D31 Resume: `Adam::save/load_state` (m/v/t/lr) + `Trainer::save/load_train_state` (model+opt+json step/seed), `test_resume` 5+5 ≡ 10 bit-exact.

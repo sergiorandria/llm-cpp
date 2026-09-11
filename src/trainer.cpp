@@ -1,6 +1,8 @@
 #include "llm/trainer.h"
 
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 
 #include "llm/loss.h"
@@ -122,6 +124,28 @@ float Trainer::evaluate(Dataset& ds) {
 }
 void Trainer::save_checkpoint(const std::string& path) {
     model_.save(path);
+}
+void Trainer::save_train_state(const std::string& prefix) {
+    std::filesystem::create_directories(std::filesystem::path(prefix).parent_path().string().empty()
+        ? "." : std::filesystem::path(prefix).parent_path().string());
+    model_.save_binary(prefix + ".model.bin");
+    { std::ofstream os(prefix + ".opt.bin", std::ios::binary); optim_.save_state(os); }
+    { std::ofstream js(prefix + ".json"); js << "{\"step\":" << step_ << ",\"skipped\":" << skipped_
+        << ",\"seed\":" << global_seed() << "}\n"; }
+}
+void Trainer::load_train_state(const std::string& prefix) {
+    model_.load_binary(prefix + ".model.bin");
+    { std::ifstream is(prefix + ".opt.bin", std::ios::binary); if (is) optim_.load_state(is); }
+    std::ifstream js(prefix + ".json");
+    if (js) {
+        std::string s((std::istreambuf_iterator<char>(js)), {});
+        auto num = [&](const char* k) {
+            auto p = s.find(k); if (p == std::string::npos) return 0;
+            return std::stoi(s.substr(s.find(':', p) + 1));
+        };
+        step_ = num("\"step\""); skipped_ = num("\"skipped\"");
+        set_global_seed((uint64_t)num("\"seed\""));
+    }
 }
 bool has_nonfinite(const std::vector<Tensor>& grads) {
     for (auto& g : grads)

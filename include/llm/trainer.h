@@ -27,8 +27,13 @@ public:
     float train_step(const std::vector<int>& batch);
     float evaluate(Dataset& ds);
     void save_checkpoint(const std::string& path);
+    // D31: full training-state save/load (model weights + optimizer + step/rng).
+    // Writes <prefix>.model.bin, <prefix>.opt.bin, <prefix>.json
+    void save_train_state(const std::string& prefix);
+    void load_train_state(const std::string& prefix);
     int skipped_steps() const { return skipped_; }
     int step() const { return step_; }
+    void set_step(int s) { step_ = s; }
 private:
     GPT& model_;
     TrainConfig cfg_;

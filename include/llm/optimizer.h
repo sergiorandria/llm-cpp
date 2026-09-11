@@ -1,5 +1,7 @@
 #pragma once
 #include "tensor.h"
+#include <istream>
+#include <ostream>
 #include <vector>
 namespace llm {
 class Optimizer {
@@ -9,6 +11,9 @@ public:
     virtual void zero_grad()=0;
     virtual void set_lr(float lr) {(void)lr;}
     virtual float get_lr() const { return 0.0f; }
+    // D31: training-state persistence (default no-op for SGD-style without state)
+    virtual void save_state(std::ostream& os) const {(void)os;}
+    virtual void load_state(std::istream& is) {(void)is;}
 };
 class SGD : public Optimizer {
 public:
@@ -26,6 +31,8 @@ public:
     void zero_grad() override {}
     void set_lr(float lr) override { lr_ = lr; }
     float get_lr() const override { return lr_; }
+    void save_state(std::ostream& os) const override;
+    void load_state(std::istream& is) override;
 protected:
     float lr_, b1_, b2_, eps_; int t_=0;
     std::vector<Tensor> m_, v_;

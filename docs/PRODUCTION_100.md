@@ -110,7 +110,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 
 ## D. Training production (D31–D40)
 
-- [ ] **D31 Resume from checkpoint** — `src/checkpoint.cpp`, `src/optimizer.cpp`, `src/scheduler.cpp`.
+- [x] **D31 Resume from checkpoint** — `src/checkpoint.cpp`, `src/optimizer.cpp`, `src/scheduler.cpp`.
   Persist `optimizer_state + scheduler_step + rng_state` in binary v4 header.
   Test: train 5 steps, resume 5 steps ≡ train 10 steps bit-exact (deterministic mode).
 - [ ] **D32 SafeTensors I/O** — `src/checkpoint.cpp` (+ `safetensors.cpp` new if >200 LOC).
