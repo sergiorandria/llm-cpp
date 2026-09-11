@@ -12,11 +12,22 @@ struct BeamState {
 };
 
 std::vector<int> beam_search(const GPT& model, const std::vector<int>& prompt, size_t max_new_tokens, size_t beam_width){
+    BeamConfig c;
+    c.beam_width = beam_width;
+    return beam_search_cfg(model, prompt, max_new_tokens, c);
+}
+
+std::vector<int> beam_search_cfg(const GPT& model, const std::vector<int>& prompt, size_t max_new_tokens, BeamConfig cfg){
+    size_t beam_width = cfg.beam_width;
     if(beam_width<=1) return model.generate(prompt, max_new_tokens, 0.0f, 0);
     if(max_new_tokens==0) return prompt;
-    const auto& cfg = model.config();
-    size_t vocab = cfg.vocab_size;
-    size_t block_size = cfg.block_size;
+    const auto& config = model.config();
+    size_t vocab = config.vocab_size;
+    size_t block_size = config.block_size;
+    auto norm_score = [&](float s, size_t len) {
+        if (cfg.len_penalty == 0.0f || len == 0) return s;
+        return s / std::pow((float)len, cfg.len_penalty);
+    };
 
     std::vector<BeamState> beams;
     beams.push_back({prompt, 0.0f});
@@ -66,18 +77,21 @@ std::vector<int> beam_search(const GPT& model, const std::vector<int>& prompt, s
                 candidates.push_back(std::move(nb));
             }
         }
-        // Keep top beam_width candidates by score
+        // Keep top beam_width candidates by length-normalized score
         // If candidates fewer than beam_width, keep all
         std::sort(candidates.begin(), candidates.end(),
-            [](const BeamState& a, const BeamState& b){ return a.score > b.score; });
+            [&](const BeamState& a, const BeamState& b){ return norm_score(a.score, a.tokens.size()) > norm_score(b.score, b.tokens.size()); });
         if(candidates.size() > beam_width) candidates.resize(beam_width);
         beams = std::move(candidates);
         if(beams.empty()) break;
+        // E49 early stop: if best beam already produced max length and no active beam
+        // can beat it (all extensions only decrease raw score since logp<=0)
+        if (cfg.early_stop && step + 1 >= max_new_tokens) break;
     }
-    // Return best scoring beam
+    // Return best scoring beam (length-normalized when penalty set)
     if(beams.empty()) return prompt;
     auto best = std::max_element(beams.begin(), beams.end(),
-        [](const BeamState& a, const BeamState& b){ return a.score < b.score; });
+        [&](const BeamState& a, const BeamState& b){ return norm_score(a.score, a.tokens.size()) < norm_score(b.score, b.tokens.size()); });
     return best->tokens;
 }
 

@@ -152,9 +152,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   `{freq_penalty, pres_penalty}` (OpenAI semantics). Test: penalized token logit lowered exactly.
 - [x] **E47 Logit bias / constrained vocab** — `src/sampling.cpp:logit_bias: map<int,float>`.
   Test: bias=-inf token never sampled over 100 draws temp=1.
-- [ ] **E48 Speculative speedup gate** — `tests/test_speculative.cpp` + `docs/BENCHMARK_DASHBOARD.md`.
+- [x] **E48 Speculative speedup gate** — `tests/test_speculative.cpp` + `docs/BENCHMARK_DASHBOARD.md`.
   Record draft/target sizes + measured speedup; CI warns if batched verify slower than greedy.
-- [ ] **E49 Beam length penalty + early stop** — `src/beam.cpp:BeamConfig{len_penalty=0.6, early_stop=true}`.
+- [x] **E49 Beam length penalty + early stop** — `src/beam.cpp:BeamConfig{len_penalty=0.6, early_stop=true}`.
   Score `logprob / len^penalty`. Test: penalty=0 prefers longer; large penalty prefers shorter.
 - [ ] **E50 Quantized GEMM inference** — `src/quantize.cpp` (fix `quantize.h:8` float-stub).
   Real `int8` storage + `int8_gemm(u8/s8, scale)` dispatch in `Tensor::matmul` when `model.is_quantized()`.
