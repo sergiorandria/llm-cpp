@@ -53,6 +53,23 @@ static std::string body_of(const std::string& r) {
     size_t p = r.find("\r\n\r\n");
     return p == std::string::npos ? "" : r.substr(p + 4);
 }
+static bool valid_utf8(const std::string& s) {
+    // chatbot JSON must always be valid UTF-8 (server emits U+FFFD for strays)
+    for (size_t i = 0; i < s.size();) {
+        unsigned char c = s[i];
+        size_t need = 1;
+        if (c < 0x80) need = 1;
+        else if ((c & 0xE0) == 0xC0) need = 2;
+        else if ((c & 0xF0) == 0xE0) need = 3;
+        else if ((c & 0xF8) == 0xF0) need = 4;
+        else return false;
+        if (i + need > s.size()) return false;
+        for (size_t k = 1; k < need; ++k)
+            if (((unsigned char)s[i + k] & 0xC0) != 0x80) return false;
+        i += need;
+    }
+    return true;
+}
 
 int main() {
     llm::Config cfg;
@@ -80,6 +97,8 @@ int main() {
     auto gen = model.generate(ids, 4, 0.0f);
     std::string expect = tok.decode(std::vector<int>(gen.begin() + ids.size(), gen.end()));
     assert(text == expect);
+    // JSON bodies are always valid UTF-8 (stray bytes -> U+FFFD)
+    assert(valid_utf8(body_of(r)));
     // 400 on bad temperature (calls hoisted)
     std::string rb = http_post(port, "/v1/completions", "{\"prompt\":\"Hi\",\"temperature\":-1}");
     bool is400 = status_of(rb) == 400;
@@ -103,6 +122,11 @@ int main() {
     // dispatch-level 429 path parity: direct dispatch still 200 (gate is at connection layer)
     llm::HttpResponse d = srv.dispatch("POST", "/v1/completions", "{\"prompt\":\"Hi\",\"temperature\":0}");
     assert(d.status == 200);
+    // chat completions body is strict-parseable UTF-8 JSON
+    llm::HttpResponse ch = srv.dispatch("POST", "/v1/chat/completions",
+        "{\"messages\":[{\"role\":\"user\",\"content\":\"Hi\"}],\"max_tokens\":4}");
+    assert(ch.status == 200);
+    assert(valid_utf8(ch.body));
     srv.stop();
     srv0.stop();
     std::cout << "server test passed port=" << port << "\n";

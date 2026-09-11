@@ -200,9 +200,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   `--json` emits `{text, tokens, logprobs, latency_ms}`. Test each flag smoke.
 - [x] **G67 Config JSON schema** — `config/schema.json` + `validate_config` error strings
   (`"n_heads must divide n_embd"` not just `invalid config`). Test: 5 bad configs → 5 messages.
-- [ ] **G68 Model card generator** — `scripts/model_card.py --checkpoint → MODEL_CARD.md`
+- [x] **G68 Model card generator** — `scripts/model_card.py --checkpoint → MODEL_CARD.md`
   (params, arch, ppl, quant, license). Test: golden file on tiny checkpoint.
-- [ ] **G69 Client examples** — `examples/{curl.sh, python_openai.py, node_fetch.mjs}`.
+- [x] **G69 Client examples** — `examples/{curl.sh, python_openai.py, node_fetch.mjs}`.
   CI runs curl example against local server.
 - [x] **G70 Concurrency limit + shutdown** — `src/server.cpp:ServerConfig{max_concurrency=8}`.
   429 on overflow; SIGTERM drains. Test: 16 parallel reqs → 8×200 + 8×429.

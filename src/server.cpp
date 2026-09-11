@@ -16,14 +16,29 @@
 namespace llm {
 
 std::string json_escape(const std::string& s) {
+    // Guarantees valid UTF-8 JSON: valid multi-byte sequences pass through,
+    // stray bytes become U+FFFD (byte-level tokens can emit lone high bytes).
     std::string o;
-    for (unsigned char c : s) {
-        if (c == '"') o += "\\\"";
-        else if (c == '\\') o += "\\\\";
-        else if (c == '\n') o += "\\n";
-        else if (c == '\t') o += "\\t";
-        else if (c < 0x20) { char b[7]; snprintf(b, sizeof b, "\\u%04x", c); o += b; }
-        else o += (char)c;
+    size_t i = 0, n = s.size();
+    while (i < n) {
+        unsigned char c = s[i];
+        if (c == '"') { o += "\\\""; ++i; }
+        else if (c == '\\') { o += "\\\\"; ++i; }
+        else if (c == '\n') { o += "\\n"; ++i; }
+        else if (c == '\t') { o += "\\t"; ++i; }
+        else if (c < 0x20) { char b[7]; snprintf(b, sizeof b, "\\u%04x", c); o += b; ++i; }
+        else if (c < 0x80) { o += (char)c; ++i; }
+        else {
+            size_t need = 0;
+            if ((c & 0xE0) == 0xC0) need = 2;
+            else if ((c & 0xF0) == 0xE0) need = 3;
+            else if ((c & 0xF8) == 0xF0) need = 4;
+            bool ok = need > 0 && i + need <= n;
+            for (size_t k = 1; ok && k < need; ++k)
+                if (((unsigned char)s[i + k] & 0xC0) != 0x80) ok = false;
+            if (ok) { o.append(s, i, need); i += need; }
+            else { o += "\xEF\xBF\xBD"; ++i; }  // U+FFFD
+        }
     }
     return o;
 }
