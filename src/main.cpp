@@ -58,6 +58,7 @@ void print_usage(const char* prog) {
 }
 
 int main(int argc, char* argv[]) {
+    llm::init_threading();  // I81: honor LLM_THREADS / OMP_NUM_THREADS
     if (argc < 2) {
         print_usage(argv[0]);
         // Demo: tiny forward pass

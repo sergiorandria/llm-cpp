@@ -233,10 +233,10 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 
 ## I. Hardware & perf (I81–I90)
 
-- [ ] **I81 Thread-pool tuning** — `CMakeLists.txt` + `src/tensor.cpp`.
+- [x] **I81 Thread-pool tuning** — `CMakeLists.txt` + `src/tensor.cpp`.
   `OMP_NUM_THREADS` + `LLM_THREADS` env, pin via `proc_bind`. Document in `docs/BUILD.md`.
   Test: `bench_matmul` scales ≥1.5× 1→4 threads on 512².
-- [ ] **I82 SIMD layernorm/softmax/gelu** — `src/tensor.cpp` via `USE_NUMPY_CPP` SIMD paths
+- [x] **I82 SIMD layernorm/softmax/gelu** — `src/tensor.cpp` via `USE_NUMPY_CPP` SIMD paths
   (verify AVX2/NEON dispatch, no scalar fallback on x86_64). Test: SIMD ≡ scalar <1e-6.
 - [ ] **I83 GEMM autotune extension** — `scripts/autotune_flash.py` → also tune `GEMM_BLOCK_M/N/K`.
   Emit `include/llm/gemm_config.h`. `docs/BENCHMARK_DASHBOARD.md` records before/after.
