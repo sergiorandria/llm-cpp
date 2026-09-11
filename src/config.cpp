@@ -23,6 +23,10 @@ void save_config(const Config& cfg, const std::string& path){
 bool validate_config(const Config& cfg){
     if(cfg.n_embd % cfg.n_heads !=0) return false;
     if(cfg.vocab_size==0 || cfg.n_layers==0) return false;
+    // C24: ALiBi and RoPE are mutually exclusive position encodings
+    if(cfg.use_alibi && cfg.pos_encoding == PosEncoding::RoPE) return false;
+    if(cfg.rope_scaling < 1.0f) return false;
+    if(cfg.global_every == 0) return false;
     return true;
 }
 }

@@ -23,6 +23,9 @@ struct Config {
     std::vector<float> weight_decay_per_layer;
     float rope_theta = 10000.0f; // RoPE base, NTK scaling for 8k: 50000
     float rope_scaling = 1.0f; // 1.0 = 1k, 4.0 = 4k, 8.0 = 8k
+    int rope_mode = 0; // C23: 0 = NTK (base*scaling), 1 = YaRN ramp
+    float yarn_alpha = 1.0f; // C23: YaRN attention scale sqrt(1+0.1*ln(scaling))
+    float yarn_beta = 32.0f; // C23: ramp low/high (dims below low full scale, above high none)
     bool deterministic = false; // A08: fixed seeds + single-thread when true
     bool use_rmsnorm = false; // C22: RMSNorm instead of LayerNorm
     bool use_alibi = false; // C24: ALiBi bias (mutually exclusive with RoPE)

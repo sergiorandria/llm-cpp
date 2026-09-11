@@ -73,3 +73,5 @@
 - B20 Fuzz corpus: `tests/fuzz_corpus/` (empty/invalid-utf8/malagasy/tiny), `fuzz_tokenizer` asserts byte-roundtrip. Track B complete (10/10), 45/45 green.
 - C21 GQA: `gqa_forward(x,Wq,Wk,Wv,nq,nkv,hd)` (`mqa.h/cpp`), nkv==1 ≡ `mqa_forward` <1e-4, `test_gqa`.
 - C22 RMSNorm switch: `Config::use_rmsnorm` + `TransformerConfig::use_rmsnorm`, block + ln_f forward/incr/backward branch, `test_rmsnorm_model` trains.
+- C23 YaRN: `rope_cfg` NTK base*scaling + YaRN ramp/attn-scale (`model.cpp`), `rope_mode/yarn_alpha/yarn_beta`, ntk-vs-yarn differ 0.19.
+- C24 Guard: `validate_config` rejects alibi+RoPE, scaling>=1, global_every>0, `test_yarn_guard`.

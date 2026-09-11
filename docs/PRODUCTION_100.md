@@ -88,9 +88,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   Test: `n_kv_heads=n_heads` ≡ MHA; `=1` ≡ MQA; `=4` KV-cache 3× smaller.
 - [x] **C22 RMSNorm config switch** — `include/llm/model.h:Config{norm=RMS|Layer}`.
   Wire through `TransformerBlock` + `ln_f`. Test: RMS model trains 10 steps, ppl finite.
-- [ ] **C23 YaRN rope scaling** — `src/model.cpp:36` extend `rope_scaling` to `{ntk, yarn}` modes.
+- [x] **C23 YaRN rope scaling** — `src/model.cpp:36` extend `rope_scaling` to `{ntk, yarn}` modes.
   Add `Config{rope_yarn_alpha, rope_yarn_beta}`. Test: 8k context (`rope_theta=50000`) forward no NaN.
-- [ ] **C24 ALiBi⊕RoPE guard** — `src/model.cpp`, `src/alibi.cpp`.
+- [x] **C24 ALiBi⊕RoPE guard** — `src/model.cpp`, `src/alibi.cpp`.
   `validate_config` rejects `alibi && pos_encoding==RoPE` (mutually exclusive). Test asserts exit code.
 - [ ] **C25 Hybrid sliding+global** — `src/sliding.cpp`, `include/llm/model.h:Config{sliding_window=512, global_every=4}`.
   Every 4th layer full attention. Test: 2k-token forward matches full-attn ppl within 5%.
