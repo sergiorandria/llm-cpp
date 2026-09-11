@@ -40,6 +40,9 @@ public:
     int skipped_steps() const { return skipped_; }
     int step() const { return step_; }
     void set_step(int s) { step_ = s; }
+    // H79: NaN rollback — snapshot last-good params; on non-finite loss restore + halve LR
+    void snapshot_params();
+    bool rollback_if_nonfinite(float loss);  // true if rolled back
     // D37: last per-step metrics (JSONL logger reads these)
     float last_loss() const { return last_loss_; }
     float last_grad_norm() const { return last_grad_norm_; }
@@ -55,6 +58,8 @@ private:
     size_t accum_count_ = 0;
     float last_loss_ = 0.0f;
     float last_grad_norm_ = 0.0f;
+    std::vector<Tensor> last_good_;  // H79 snapshot
+    bool has_snapshot_ = false;
     void clip_grads(std::vector<Tensor>& grads);
 };
 }

@@ -207,6 +207,19 @@ bool has_nonfinite(const std::vector<Tensor>& grads) {
             if (!std::isfinite(v)) return true;
     return false;
 }
+void Trainer::snapshot_params() {
+    last_good_.clear();
+    for (auto* p : model_.parameters()) last_good_.push_back(*p);
+    has_snapshot_ = true;
+}
+bool Trainer::rollback_if_nonfinite(float loss) {
+    if (std::isfinite(loss) || !has_snapshot_) return false;
+    auto params = model_.parameters();
+    for (size_t i = 0; i < params.size() && i < last_good_.size(); ++i)
+        params[i]->data = last_good_[i].data;
+    optim_.set_lr(optim_.get_lr() * 0.5f);
+    return true;
+}
 void Trainer::clip_grads(std::vector<Tensor>& grads) {
     clip_by_global_norm(grads, cfg_.grad_clip);
 }

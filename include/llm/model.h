@@ -71,6 +71,8 @@ public:
 
     void save(const std::string& path) const;
     void save_binary(const std::string& path) const;
+    // H78: crash-safe write — tmp + fsync + rename, old checkpoint intact on kill
+    void save_binary_atomic(const std::string& path) const;
     void load_binary(const std::string& path);
     void load(const std::string& path);
 

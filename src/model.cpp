@@ -1,10 +1,13 @@
 #include "llm/model.h"
 
 #include <cmath>
+#include <cstdio>
+#include <fcntl.h>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <random>
+#include <unistd.h>
 
 #include "llm/kv_cache.h"
 #include "llm/profiling.h"
@@ -362,6 +365,16 @@ void GPT::save(const std::string& path) const {
     save_binary(path);
     std::cout << "[save] checkpoint written to " << path << " (" << num_parameters()
               << " params)\n";
+}
+void GPT::save_binary_atomic(const std::string& path) const {
+    std::string tmp = path + ".tmp";
+    save_binary(tmp);
+    int fd = open(tmp.c_str(), O_RDONLY);
+    if (fd >= 0) {
+        fsync(fd);
+        close(fd);
+    }
+    std::rename(tmp.c_str(), path.c_str());
 }
 void GPT::save_binary(const std::string& path) const {
     // Ensure parent directory exists

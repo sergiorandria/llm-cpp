@@ -224,9 +224,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   Covers GGUF + tokenizer + speculative (already green locally per CHANGELOG 0.3.1–0.3.2).
 - [x] **H77 GGUF fuzz harness** — `tests/fuzz_gguf.cpp` (magic/truncation/corrupt-shape mutations).
   ASAN-clean on 10k mutations; bad magic rejected, no crash (matches `test_gguf_roundtrip` bad-magic path).
-- [ ] **H78 Atomic checkpoint write** — `src/checkpoint.cpp:save_atomic` (write `.tmp` + `fsync` + `rename`).
+- [x] **H78 Atomic checkpoint write** — `src/checkpoint.cpp:save_atomic` (write `.tmp` + `fsync` + `rename`).
   Test: kill -9 mid-write simulation leaves old checkpoint intact.
-- [ ] **H79 NaN-rollback** — `src/trainer.cpp:keep_last_good(params)` snapshot every `eval_every`.
+- [x] **H79 NaN-rollback** — `src/trainer.cpp:keep_last_good(params)` snapshot every `eval_every`.
   On NaN loss restore + halve LR. Test: injected NaN recovers and loss finite next step.
 - [x] **H80 Generation audit log** — `src/server.cpp:ServerConfig{audit_log=path}` appends
   `{ts, prompt_hash, tokens, params}` (never raw PII by default). Test: 2 reqs → 2 lines, hash stable.
