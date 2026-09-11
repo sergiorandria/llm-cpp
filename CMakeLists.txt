@@ -100,6 +100,12 @@ endif()
 
 option(BUILD_TESTS "Build tests" ON)
 option(ENABLE_SANITIZERS "Enable sanitizers" OFF)
+# J94: coverage (lcov in CI; baseline gate 80% lines, target 90%)
+option(ENABLE_COVERAGE "Enable gcov coverage" OFF)
+if(ENABLE_COVERAGE)
+  add_compile_options(--coverage -O0 -fno-inline)
+  add_link_options(--coverage)
+endif()
 
 if(ENABLE_SANITIZERS)
   add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)

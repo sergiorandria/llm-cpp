@@ -263,9 +263,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   (except `docs/`-only PRs). Retroactively add Unreleased section for A–I as landed.
 - [x] **J93 clang-format + clang-tidy** — `.clang-format` exists; add `.clang-tidy` + pre-commit hook.
   `scripts/lint.sh` runs both. Test: CI lint green (fix `build/` warnings first).
-- [ ] **J94 Coverage gate** — `cmake -DENABLE_COVERAGE=ON` + `lcov`; fail if line coverage <80%
+- [x] **J94 Coverage gate** — `cmake -DENABLE_COVERAGE=ON` + `lcov`; fail if line coverage <80%
   (target 90% by 1.0). Upload to Codecov. Exclude `examples/`, `build*/`.
-- [ ] **J95 Overfit integration test** — `tests/test_overfit.cpp` (new, CTest `overfit`, timeout 300s).
+- [x] **J95 Overfit integration test** — `tests/test_overfit.cpp` (new, CTest `overfit`, timeout 300s).
   Tiny Shakespeare 200 lines, 2-layer 64-embd, 50 steps → `ppl` strictly decreases, final < initial/1.5.
 - [ ] **J96 Quantized GGUF roundtrip** — extend `tests/test_gguf_roundtrip.cpp` to Q8_0 path (pairs with F54).
   Assert dequant err bound + greedy decode identical to fp32 on fixed prompt.

@@ -139,3 +139,5 @@
 - J91 Version: `cmake/version.cmake` generates `llm/version.h` from `git describe`, `llm-cpp --version`, `test_version`.
 - J92 Gate: `lint.yml` changelog job (code PRs without CHANGELOG entry fail; docs-only skip).
 - J93 Lint: `.clang-tidy` + `scripts/lint.sh` (format gate on changed files, tidy opt-in LINT_TIDY=1) + session-wide `style:` format commit; legacy files grandfathered.
+- J94 Coverage: `-DENABLE_COVERAGE=ON` (gcov flags) + `coverage.yml` (lcov, 80% line gate, Codecov upload).
+- J95 Overfit: `test_overfit` Shakespeare-200 2L/64e 100 steps loss 5.10→0.04 slope<0 (6.8s).

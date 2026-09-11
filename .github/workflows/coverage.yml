@@ -1,0 +1,33 @@
+name: coverage
+on: [push, pull_request]
+jobs:
+  cov:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install lcov
+        run: sudo apt-get update && sudo apt-get install -y lcov
+      - name: configure with coverage
+        run: cmake -B build-cov -DCMAKE_BUILD_TYPE=Debug -DENABLE_COVERAGE=ON -DBUILD_TESTS=ON
+      - name: build
+        run: cmake --build build-cov -j4
+      - name: test
+        run: ctest --test-dir build-cov --output-on-failure
+      - name: J94 gate (line coverage >= 80%)
+        run: |
+          lcov --capture --directory build-cov --output-file cov.info \
+            --exclude '*/build-cov/_deps/*' --exclude '*/tests/*' --exclude '*/examples/*' --ignore-errors mismatch
+          lcov --summary cov.info
+          python3 -c "
+          import re,sys
+          txt = open('cov.info').read()
+          taken = sum(int(x) for x in re.findall(r'^DA:\d+,(\d+)', txt, re.M))
+          total = len(re.findall(r'^DA:', txt, re.M))
+          pct = 100*taken/total if total else 0
+          print(f'lines {taken}/{total} = {pct:.1f}%')
+          sys.exit(0 if pct >= 80 else 1)"
+      - name: upload
+        uses: codecov/codecov-action@v4
+        with:
+          files: cov.info
+          fail_ci_if_error: false
