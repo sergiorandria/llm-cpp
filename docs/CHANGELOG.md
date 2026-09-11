@@ -79,3 +79,5 @@
 - C26 MoE aux: `MoEFFN::aux_loss` CV² load-balance, uniform≈0, `test_hybrid_moe`.
 - C27 LoRA: `delta/merge_into/unmerge_from` (`lora.h/cpp`), merged ≡ base+adapter <1e-4, `test_lora_tie`.
 - C28 Tying: copy-on-tie locked (lm_head==wte^T, params counted once), `test_lora_tie` tied<untied.
+- C29 Checkpointing: `TrainConfig::checkpointing` honored (recompute-always, on/off grads identical <1e-5).
+- C30 Extend: `GPT::extend_context(new)` wpe linear interp, shrink no-op, `test_ckpt_extend`. Track C complete (10/10).

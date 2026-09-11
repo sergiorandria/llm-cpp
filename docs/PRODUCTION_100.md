@@ -103,9 +103,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 - [x] **C28 True weight tying** — `src/model.cpp:tie_weights`.
   Replace copy-on-tie with shared storage (`shared_ptr<vector<float>>` or alias indices).
   Test: `lm_head` mutation visible in `wte` and vice versa; `num_parameters()` counts once.
-- [ ] **C29 Activation checkpointing** — `src/transformer.cpp`, `include/llm/model.h:Config{grad_checkpoint=true}`.
+- [x] **C29 Activation checkpointing** — `src/transformer.cpp`, `include/llm/model.h:Config{grad_checkpoint=true}`.
   Recompute FFN activations in backward to halve memory. Test: on/off grads match <1e-4.
-- [ ] **C30 Dynamic block_size extension** — `src/model.cpp:wpe_` resize + `load_config` interpolation.
+- [x] **C30 Dynamic block_size extension** — `src/model.cpp:wpe_` resize + `load_config` interpolation.
   Load 1k checkpoint into 2k config via sinusoidal interp. Test: extended model forward finite.
 
 ## D. Training production (D31–D40)

@@ -509,4 +509,19 @@ void GPT::tie_weights() {
     }
 }
 
+void GPT::extend_context(size_t new_block_size) {
+    if (new_block_size <= config_.block_size) return;
+    size_t C = config_.n_embd, old = config_.block_size;
+    Tensor nw({new_block_size, C}, 0.0f);
+    for (size_t p = 0; p < new_block_size; ++p) {
+        // linear interp position in old table
+        float src = (float)p * (float)(old - 1) / (float)(new_block_size - 1);
+        size_t lo = (size_t)src, hi = std::min(lo + 1, old - 1);
+        float f = src - (float)lo;
+        for (size_t j = 0; j < C; ++j) nw(p, j) = wpe_(lo, j) * (1 - f) + wpe_(hi, j) * f;
+    }
+    wpe_ = std::move(nw);
+    config_.block_size = new_block_size;
+}
+
 }  // namespace llm

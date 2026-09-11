@@ -114,3 +114,5 @@ add_executable(test_hybrid_moe test_hybrid_moe.cpp ../src/model.cpp ../src/atten
 add_test(NAME hybrid_moe COMMAND test_hybrid_moe)
 add_executable(test_lora_tie test_lora_tie.cpp ../src/lora.cpp ../src/tensor.cpp ../src/model.cpp ../src/attention.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp)
 add_test(NAME lora_tie COMMAND test_lora_tie)
+add_executable(test_ckpt_extend test_ckpt_extend.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/trainer.cpp ../src/dataset.cpp ../src/optimizer.cpp ../src/scheduler.cpp ../src/loss.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp)
+add_test(NAME ckpt_extend COMMAND test_ckpt_extend)

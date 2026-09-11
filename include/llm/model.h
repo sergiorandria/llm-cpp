@@ -71,6 +71,8 @@ public:
     // For weight tying: share storage via copy-on-tie (true alias would need shared_ptr)
     void tie_weights();
     const Config& config() const { return config_; }
+    // C30: extend context by interpolating wpe_ to new_block_size (>= current)
+    void extend_context(size_t new_block_size);
 
 private:
     Config config_;
