@@ -15,6 +15,7 @@ struct TrainConfig {
     size_t grad_accum_steps=1; // gradient accumulation: effective batch = batch_size * accum
     bool checkpointing=false; // activation checkpointing
     bool allow_untrained_params=false; // if false, never silently use random noise for grads
+    float label_smoothing=0.0f; // A03: 0 = hard targets
 };
 class Trainer {
 public:

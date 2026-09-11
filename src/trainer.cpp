@@ -74,13 +74,7 @@ float Trainer::train_step(const std::vector<int>& batch) {
     }
     // Real backward: zero grads, compute dlogits, backprop through entire model
     model_.zero_grad();
-    size_t T = logits.shape[0], V = logits.shape[1];
-    Tensor dlogits = logits.softmax(1);
-    for (size_t i = 0; i < T && i < batch.size(); ++i) {
-        int tgt = batch[i];
-        if (tgt >= 0 && (size_t)tgt < V) dlogits(i, tgt) -= 1.0f;
-        for (size_t j = 0; j < V; ++j) dlogits(i, j) /= float(T);
-    }
+    Tensor dlogits = cross_entropy_backward(logits, batch, cfg_.label_smoothing);
     model_.backward(dlogits, batch, hidden);
     // Collect grads from parameters' grad fields
     auto params = model_.parameters();

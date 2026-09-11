@@ -80,3 +80,5 @@ add_executable(test_rmsnorm test_rmsnorm.cpp ../src/tensor.cpp ../src/layernorm.
 add_test(NAME rmsnorm COMMAND test_rmsnorm)
 add_executable(test_grad_check test_grad_check.cpp ../src/tensor.cpp ../src/layernorm.cpp)
 add_test(NAME grad_check COMMAND test_grad_check)
+add_executable(test_ce_backward test_ce_backward.cpp ../src/tensor.cpp ../src/loss.cpp)
+add_test(NAME ce_backward COMMAND test_ce_backward)

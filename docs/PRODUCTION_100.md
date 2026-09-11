@@ -28,7 +28,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 - [x] **A02 Central grad-check harness** — `tests/grad_check.h` (new).
   Helper `finite_diff(model, tokens, eps=1e-3)` reused by train/rlhf/pipeline tests.
   Commit refactors `test_train_step.cpp` + `test_grad_clip.cpp` to use it, no new logic.
-- [ ] **A03 Cross-entropy backward + label smoothing** — `src/loss.cpp`, `include/llm/loss.h`.
+- [x] **A03 Cross-entropy backward + label smoothing** — `src/loss.cpp`, `include/llm/loss.h`.
   Add `cross_entropy_backward(logits, target, smoothing=0.0/0.1)` returning dlogits.
   Test: smoothing=0 matches softmax-cross-entropy analytic; smoothing=0.1 sums to 0.
 - [ ] **A04 AdamW bias-correction + decoupled decay** — `src/optimizer.cpp`.
