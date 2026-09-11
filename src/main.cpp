@@ -85,7 +85,10 @@ int main(int argc, char* argv[]) {
     if (cmd == "--help" || cmd == "-h") {
         print_usage(argv[0]);
         return 0;
-} else if (cmd == "train") {
+    } else if (cmd == "--version" || cmd == "-V") {
+        std::cout << "llm-cpp " << LLM_CPP_VERSION << "\n";
+        return 0;
+    } else if (cmd == "train") {
     auto args = llm::parse_args(argc, argv);
     std::string cfg_path = args.get("config", "config/config.json.example");
     std::string data_path = args.get("data", "data/input.txt");

@@ -21,6 +21,10 @@ else()
 endif()
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g -DNDEBUG")
 
+# J91: version from git describe (generated header shadows static fallback)
+include(${CMAKE_SOURCE_DIR}/cmake/version.cmake)
+include_directories(BEFORE ${CMAKE_BINARY_DIR}/generated)
+
 include_directories(include)
 
 # ── Third-party: numpy-cpp (header-only, C++20) ──────────────────────────

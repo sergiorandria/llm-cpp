@@ -136,3 +136,4 @@
 - I89 Bench: `bench_infer` (trials p50/p95, tok/s) + `bench.yml` 10% gate vs 352.6 baseline; found nested-OpenMP oversubscription (0.37 vs 352 tok/s — pin threads=1), documented in BUILD.md.
 - Build: `profiling.cpp` added to 45 test targets + llm-c-api (new PROFILE refs).
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.
+- J91 Version: `cmake/version.cmake` generates `llm/version.h` from `git describe`, `llm-cpp --version`, `test_version`.

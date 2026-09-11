@@ -257,7 +257,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 
 ## J. Release & ecosystem (J91–J100)
 
-- [ ] **J91 Version automation** — `include/llm/version.h` from `git describe` via CMake.
+- [x] **J91 Version automation** — `include/llm/version.h` from `git describe` via CMake.
   `llm-cpp --version` prints `0.x.y+sha`. Test: version string matches `CHANGELOG` head.
 - [ ] **J92 CHANGELOG gate** — `.github/workflows/lint.yml`: PR fails if no `docs/CHANGELOG.md` diff
   (except `docs/`-only PRs). Retroactively add Unreleased section for A–I as landed.
