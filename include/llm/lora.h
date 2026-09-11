@@ -8,6 +8,10 @@ class LoRAAdapter {
 public:
     LoRAAdapter(size_t in_dim, size_t out_dim, LoRAConfig cfg={});
     Tensor forward(const Tensor& x) const; // x [T, in] -> [T, out]
+    // C27: delta = (A·B) * alpha/r; merge adds delta into W, unmerge subtracts it
+    Tensor delta() const;
+    void merge_into(Tensor& W) const;
+    void unmerge_from(Tensor& W) const;
     std::vector<Tensor*> parameters();
 private:
     LoRAConfig cfg_;

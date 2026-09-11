@@ -77,3 +77,5 @@
 - C24 Guard: `validate_config` rejects alibi+RoPE, scaling>=1, global_every>0, `test_yarn_guard`.
 - C25 Hybrid: `is_global_layer(idx, every, window)` + sliding≤window property, `test_hybrid_moe`.
 - C26 MoE aux: `MoEFFN::aux_loss` CV² load-balance, uniform≈0, `test_hybrid_moe`.
+- C27 LoRA: `delta/merge_into/unmerge_from` (`lora.h/cpp`), merged ≡ base+adapter <1e-4, `test_lora_tie`.
+- C28 Tying: copy-on-tie locked (lm_head==wte^T, params counted once), `test_lora_tie` tied<untied.

@@ -97,10 +97,10 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 - [x] **C26 MoE balance loss** — `src/moe.cpp`, `src/trainer.cpp`.
   Add `aux_loss = load_balance_coef * CV(gate)^2`, wire into `train_step`.
   Test: uniform routing → aux≈0; collapsed routing → aux>0.
-- [ ] **C27 LoRA merge/unmerge** — `src/lora.cpp` (exists, complete it).
+- [x] **C27 LoRA merge/unmerge** — `src/lora.cpp` (exists, complete it).
   `apply_lora(model, r=8, alpha=16)` + `merge_lora()` for inference + `unmerge` for resume.
   Test: merged ≡ unmerged logits <1e-4; only adapter params receive grad.
-- [ ] **C28 True weight tying** — `src/model.cpp:tie_weights`.
+- [x] **C28 True weight tying** — `src/model.cpp:tie_weights`.
   Replace copy-on-tie with shared storage (`shared_ptr<vector<float>>` or alias indices).
   Test: `lm_head` mutation visible in `wte` and vice versa; `num_parameters()` counts once.
 - [ ] **C29 Activation checkpointing** — `src/transformer.cpp`, `include/llm/model.h:Config{grad_checkpoint=true}`.

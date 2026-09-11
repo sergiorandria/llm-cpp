@@ -11,5 +11,21 @@ Tensor LoRAAdapter::forward(const Tensor& x) const {
     for (auto &v: out.data) v *= scale;
     return out;
 }
+Tensor LoRAAdapter::delta() const {
+    Tensor d = A_.matmul(B_);
+    float scale = cfg_.alpha / float(cfg_.rank);
+    for (auto& v : d.data) v *= scale;
+    return d;
+}
+void LoRAAdapter::merge_into(Tensor& W) const {
+    Tensor d = delta();
+    assert(W.data.size() == d.data.size());
+    for (size_t i = 0; i < W.data.size(); ++i) W.data[i] += d.data[i];
+}
+void LoRAAdapter::unmerge_from(Tensor& W) const {
+    Tensor d = delta();
+    assert(W.data.size() == d.data.size());
+    for (size_t i = 0; i < W.data.size(); ++i) W.data[i] -= d.data[i];
+}
 std::vector<Tensor*> LoRAAdapter::parameters(){ return {&A_, &B_}; }
 }
