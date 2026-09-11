@@ -69,3 +69,5 @@
 - B16 Packing: `pack_with_eos(tokens, block, eos)` + masks, `test_data_pipeline`.
 - B17 Shuffle: `DataLoader(ds, batch, shuffle, seed)` Fisher-Yates block order, same-seed identical, full coverage.
 - B18 Split: `train_val_split(tokens, ratio, seed)`, 900/100 contiguous.
+- B19 Downloader: `scripts/download_data.py` (tinystories/shakespeare, sha256, --dry-run).
+- B20 Fuzz corpus: `tests/fuzz_corpus/` (empty/invalid-utf8/malagasy/tiny), `fuzz_tokenizer` asserts byte-roundtrip. Track B complete (10/10), 45/45 green.

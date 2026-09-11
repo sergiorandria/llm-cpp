@@ -75,9 +75,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   `DataLoader{num_workers=2}` background tokenization. Test: shuffled epoch covers all tokens once.
 - [x] **B18 Train/val split + eval hook** — `src/dataset.cpp:train_val_split(0.99)`, `src/trainer.cpp`.
   `Trainer::evaluate(val_ds)` returns ppl. Test: overfit tiny set → train ppl < val ppl initially.
-- [ ] **B19 Data downloader + checksum** — `scripts/download_data.py` (new), `data/README.md`.
+- [x] **B19 Data downloader + checksum** — `scripts/download_data.py` (new), `data/README.md`.
   Fetch TinyStories/Shakespeare with SHA256 verify. Test (CTest `download_smoke`): `--dry-run` passes offline.
-- [ ] **B20 Tokenizer fuzz corpus** — `tests/fuzz_tokenizer.cpp`, `.github/workflows/fuzz.yml`.
+- [x] **B20 Tokenizer fuzz corpus** — `tests/fuzz_tokenizer.cpp`, `.github/workflows/fuzz.yml`.
   Add seed corpus `tests/fuzz_corpus/*` (empty, long, invalid UTF-8, Malagasy lines).
   Gate: 60s libFuzzer run ASAN-clean.
 
