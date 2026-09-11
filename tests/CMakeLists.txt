@@ -58,7 +58,7 @@ add_executable(test_early_exit test_early_exit.cpp ../src/early_exit.cpp ../src/
 add_test(NAME early_exit COMMAND test_early_exit)
 add_executable(test_eval test_eval.cpp ../src/eval.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/loss.cpp ../src/utils.cpp ../src/profiling.cpp)
 add_test(NAME eval COMMAND test_eval)
-add_executable(test_gptq test_gptq.cpp ../src/gptq.cpp ../src/tensor.cpp)
+add_executable(test_gptq test_gptq.cpp ../src/gptq.cpp ../src/checkpoint.cpp ../src/tensor.cpp ../src/model.cpp ../src/attention.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp ../src/profiling.cpp)
 add_test(NAME gptq COMMAND test_gptq)
 add_executable(test_prune test_prune.cpp ../src/prune.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/utils.cpp ../src/profiling.cpp)
 add_test(NAME prune COMMAND test_prune)
