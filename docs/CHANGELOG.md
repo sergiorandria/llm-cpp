@@ -52,3 +52,4 @@
 
 ## Unreleased — PRODUCTION_100 Track A
 - A01 RMSNorm: `Tensor::rmsnorm` + `rmsnorm_backward` (`tensor.h/cpp`), `RMSNorm` class (`layernorm.h/cpp`), `test_rmsnorm` finite-diff <2e-2, 32/32 green.
+- A02 Grad-check harness: `tests/grad_check.h` central `max_fd_error`, `test_grad_check` covers matmul/layernorm/rmsnorm <2e-2.

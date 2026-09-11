@@ -78,3 +78,5 @@ add_executable(test_kv_cache_per_layer test_kv_cache_per_layer.cpp ../src/model.
 add_test(NAME kv_cache_per_layer COMMAND test_kv_cache_per_layer)
 add_executable(test_rmsnorm test_rmsnorm.cpp ../src/tensor.cpp ../src/layernorm.cpp)
 add_test(NAME rmsnorm COMMAND test_rmsnorm)
+add_executable(test_grad_check test_grad_check.cpp ../src/tensor.cpp ../src/layernorm.cpp)
+add_test(NAME grad_check COMMAND test_grad_check)

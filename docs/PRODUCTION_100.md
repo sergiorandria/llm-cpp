@@ -25,7 +25,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 - [x] **A01 RMSNorm forward+backward** — `include/llm/layernorm.h`, `src/layernorm.cpp`.
   Add `rmsnorm(x, weight, eps)` + `rmsnorm_backward`. Test `test_rmsnorm.cpp`:
   finite-diff grad err <1e-3, equivalence to LayerNorm-with-zero-mean.
-- [ ] **A02 Central grad-check harness** — `tests/grad_check.h` (new).
+- [x] **A02 Central grad-check harness** — `tests/grad_check.h` (new).
   Helper `finite_diff(model, tokens, eps=1e-3)` reused by train/rlhf/pipeline tests.
   Commit refactors `test_train_step.cpp` + `test_grad_clip.cpp` to use it, no new logic.
 - [ ] **A03 Cross-entropy backward + label smoothing** — `src/loss.cpp`, `include/llm/loss.h`.
