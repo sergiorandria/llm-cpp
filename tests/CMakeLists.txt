@@ -96,3 +96,5 @@ add_executable(test_attn_parity test_attn_parity.cpp ../src/attention.cpp ../src
 add_test(NAME attn_parity COMMAND test_attn_parity)
 add_executable(test_utf8 test_utf8.cpp ../src/tokenizer.cpp)
 add_test(NAME utf8 COMMAND test_utf8)
+add_executable(test_hf_compat test_hf_compat.cpp ../src/tokenizer.cpp)
+add_test(NAME hf_compat COMMAND test_hf_compat)

@@ -58,7 +58,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 - [x] **B11 UTF-8 correctness** — `src/tokenizer.cpp`.
   `encode` must not split multi-byte codepoints at char level; `decode` must emit valid UTF-8.
   Test: Malagasy corpus (`data/malagasy/processed/input.txt`) roundtrip byte-exact.
-- [ ] **B12 HF `vocab.json`+`merges.txt` compat** — `src/tokenizer.cpp`, `include/llm/tokenizer.h`.
+- [x] **B12 HF `vocab.json`+`merges.txt` compat** — `src/tokenizer.cpp`, `include/llm/tokenizer.h`.
   Add `load_hf(vocab_path, merges_path)` + `save_hf(dir)`. Test: roundtrip our BPE equals HF ordering.
 - [ ] **B13 Streaming decode** — `include/llm/tokenizer.h:decode_incremental(ids, prev_bytes)`.
   Buffer incomplete UTF-8 tail across `generate_streaming` callbacks. Test: emoji split across 2 tokens.

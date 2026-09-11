@@ -62,3 +62,4 @@
 - A08 Deterministic: `GPT::Config::deterministic` + `TrainConfig::deterministic` (seed 42, OMP 1 thread), `test_deterministic` bit-identical.
 - A10 Attn parity: `test_attn_parity` full≡incr <1e-3 (T=8), flash-incr≡naive <1e-4 (K=150), T={33,129} finite. Track A complete (10/10).
 - B11 UTF-8: byte-level `train()` unsigned-char fix, `test_utf8` ASCII/Malagasy/emoji/invalid + 64KB corpus roundtrip.
+- B12 HF compat: `load_hf/save_hf` (vocab.json + merges.txt #version: 0.2), `test_hf_compat` merge-order + encode equivalence.
