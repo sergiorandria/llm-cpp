@@ -267,9 +267,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   (target 90% by 1.0). Upload to Codecov. Exclude `examples/`, `build*/`.
 - [x] **J95 Overfit integration test** — `tests/test_overfit.cpp` (new, CTest `overfit`, timeout 300s).
   Tiny Shakespeare 200 lines, 2-layer 64-embd, 50 steps → `ppl` strictly decreases, final < initial/1.5.
-- [ ] **J96 Quantized GGUF roundtrip** — extend `tests/test_gguf_roundtrip.cpp` to Q8_0 path (pairs with F54).
+- [x] **J96 Quantized GGUF roundtrip** — extend `tests/test_gguf_roundtrip.cpp` to Q8_0 path (pairs with F54).
   Assert dequant err bound + greedy decode identical to fp32 on fixed prompt.
-- [ ] **J97 SBOM + license scan** — `scripts/sbom.sh` (Syft or `pip-licenses` for numpy-cpp pin).
+- [x] **J97 SBOM + license scan** — `scripts/sbom.sh` (Syft or `pip-licenses` for numpy-cpp pin).
   `THIRD_PARTY.md` lists MIT/Apache deps. CI fails on GPL-incompatible addition.
 - [ ] **J98 Build matrix** — `.github/workflows/ci.yml` extend to `{gcc-11,gcc-13,clang-15} × {Debug,Release} × {ON,OFF: USE_NUMPY_CPP, USE_OPENBLAS}`.
   All green + `ctest` 31+ new tests.

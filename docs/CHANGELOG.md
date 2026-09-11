@@ -141,3 +141,5 @@
 - J93 Lint: `.clang-tidy` + `scripts/lint.sh` (format gate on changed files, tidy opt-in LINT_TIDY=1) + session-wide `style:` format commit; legacy files grandfathered.
 - J94 Coverage: `-DENABLE_COVERAGE=ON` (gcov flags) + `coverage.yml` (lcov, 80% line gate, Codecov upload).
 - J95 Overfit: `test_overfit` Shakespeare-200 2L/64e 100 steps loss 5.10→0.04 slope<0 (6.8s).
+- J96 GGUF-Q8: `test_gguf_roundtrip` Q8_0 section (err 0.0002<0.05, greedy identical).
+- J97 SBOM: `scripts/sbom.sh` (GPL fail) + `THIRD_PARTY.md`; finding: numpy-cpp claims BSD-3 but ships NO LICENSE file (exception recorded, upstream follow-up).

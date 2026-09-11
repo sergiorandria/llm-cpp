@@ -96,6 +96,31 @@ int main() {
         std::cout << "gguf bad magic correctly rejected\n";
     }
 
+    // J96: Q8_0 quantized roundtrip — dequant err bound + greedy decode identical
+    {
+        const std::string qpath = "/tmp/test_gguf_q80.gguf";
+        bool saved = llm::save_gguf_quant(m1, qpath, 8);
+        assert(saved);
+        llm::GPT mq(cfg);
+        for (auto p : mq.parameters())
+            for (auto& v : p->data) v += 2.0f;  // poison so the check is real
+        bool loaded = llm::load_gguf(mq, qpath);
+        assert(loaded);
+        float md = 0;
+        auto pa = m1.parameters();
+        auto pb = mq.parameters();
+        for (size_t i = 0; i < pa.size(); ++i)
+            for (size_t j = 0; j < pa[i]->data.size(); ++j)
+                md = std::max(md, std::abs(pa[i]->data[j] - pb[i]->data[j]));
+        std::cout << "gguf q80 maxd=" << md << "\n";
+        assert(md < 0.05f);
+        auto g1 = m1.generate(prompt, 6, 0.0f);
+        auto g2 = mq.generate(prompt, 6, 0.0f);
+        assert(g1 == g2);
+        std::cout << "gguf q80 roundtrip passed\n";
+        std::remove(qpath.c_str());
+    }
+
     std::remove(path.c_str());
     std::cout << "test_gguf_roundtrip passed\n";
     return 0;
