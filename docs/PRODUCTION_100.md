@@ -172,15 +172,15 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   Write `GGML_TYPE_Q4_K` blocks + dequant on load. Test: Q8_0 roundtrip err <0.05.
 - [x] **F55 Sparse matmul skip-zeros** — `src/prune.cpp` + `src/tensor.cpp:matmul_sparse(mask)` CSR path.
   Dispatch when `sparsity>0.5`. Test: 50% pruned model logits match dense <1e-4, faster on 512².
-- [ ] **F56 Teacher-logit cache for distill** — `src/distill.cpp`.
+- [x] **F56 Teacher-logit cache for distill** — `src/distill.cpp`.
   `cache_teacher_logits(teacher, dataset, path)` to disk once. Test: cached ≡ live KL <1e-6.
 - [x] **F57 Structured 2:4 pruning** — `src/prune.cpp:prune_2to4(model)`.
   Every 4 weights keep top-2 by magnitude + mask tensor. Test: mask satisfies 2:4 + ppl measured.
-- [ ] **F58 Quant calibration set** — `data/calib/` 1k-line bundled sample + `scripts/calibrate.py`.
+- [x] **F58 Quant calibration set** — `data/calib/` 1k-line bundled sample + `scripts/calibrate.py`.
   `quantize --calib` derives scales from activations, not random. Test: calib scales differ from default.
-- [ ] **F59 PPL-degradation CI gate** — `.github/workflows/quant.yml` (new).
+- [x] **F59 PPL-degradation CI gate** — `.github/workflows/quant.yml` (new).
   Fail if `int8 ppl - fp32 ppl > 5%` or `4bit err > 0.5` on tiny eval. Documents `<0.3 PPL loss` claim honestly.
-- [ ] **F60 Quantize CLI** — `src/main.cpp` `--bits {4,8} --group 128 --out quantized.bin`.
+- [x] **F60 Quantize CLI** — `src/main.cpp` `--bits {4,8} --group 128 --out quantized.bin`.
   Verify flag: dequant check printed. Test: CLI smoke produces loadable file.
 
 ## G. Serving & API (G61–G70)

@@ -146,3 +146,9 @@ add_executable(test_gguf_quant test_gguf_quant.cpp ../src/gguf.cpp ../src/model.
 add_test(NAME gguf_quant COMMAND test_gguf_quant)
 add_executable(test_sparse_prune test_sparse_prune.cpp ../src/prune.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp ../src/loss.cpp)
 add_test(NAME sparse_prune COMMAND test_sparse_prune)
+add_executable(test_distill_cache test_distill_cache.cpp ../src/distill.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp ../src/loss.cpp)
+add_test(NAME distill_cache COMMAND test_distill_cache)
+add_executable(test_quant_gate test_quant_gate.cpp ../src/quantize.cpp ../src/gptq.cpp ../src/checkpoint.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp ../src/loss.cpp)
+add_test(NAME quant_gate COMMAND test_quant_gate)
+# data-dependent tests must run from repo root
+set_tests_properties(quant_gate utf8 PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

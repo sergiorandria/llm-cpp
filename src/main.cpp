@@ -8,14 +8,45 @@
 #include "llm/optimizer.h"
 #include "llm/scheduler.h"
 #include "llm/quantize.h"
+#include "llm/gptq.h"
+#include <cmath>
 #include <iostream>
 #include <string>
+
+// F60: --bits {4,8} --group N --out path. Applies in-place simulated quantization
+// (8-bit: int8 levels; 4-bit: GPTQ group levels, dequantized back to fp weights)
+// and reports mean abs param delta as dequant verify.
+static void apply_quantize_flags(llm::GPT& model, int bits, size_t group) {
+    double sum = 0;
+    size_t n = 0;
+    if (bits == 4) {
+        for (auto* p : model.parameters()) {
+            if (p->shape.size() != 2) continue;
+            llm::Tensor scale;
+            llm::Tensor q = llm::quantize_4bit(*p, scale, group);
+            llm::Tensor rec = llm::dequantize_4bit(q, scale, group);
+            for (size_t i = 0; i < p->data.size(); ++i) sum += std::abs((*p).data[i] - rec.data[i]);
+            n += p->data.size();
+            *p = rec;
+        }
+    } else {
+        for (auto* p : model.parameters()) {
+            llm::QuantizedTensor qt = llm::quantize_with_scale(*p);
+            llm::Tensor rec = llm::dequantize(qt);
+            for (size_t i = 0; i < p->data.size(); ++i) sum += std::abs((*p).data[i] - rec.data[i]);
+            n += p->data.size();
+            *p = rec;
+        }
+    }
+    std::cout << "[quantize] bits=" << bits << " group=" << group
+              << " mean_abs_delta=" << (n ? sum / n : 0) << "\n";
+}
 
 void print_usage(const char* prog) {
     std::cout << "llm-cpp v" << LLM_CPP_VERSION << "\n";
     std::cout << "Usage: " << prog << " [train|generate] [options]\n"
-              << "  train    --config <path> --data <path> [--checkpoint <path>] [--quantize]\n"
-              << "  generate --prompt <text> [--max_tokens 100] [--config <path>] [--checkpoint <path>] [--temperature 1.0] [--top_k 0] [--top_p 1.0] [--quantize]\n"
+              << "  train    --config <path> --data <path> [--checkpoint <path>] [--quantize] [--bits 4|8] [--group 128] [--out <quant.bin>]\n"
+              << "  generate --prompt <text> [--max_tokens 100] [--config <path>] [--checkpoint <path>] [--temperature 1.0] [--top_k 0] [--top_p 1.0] [--quantize] [--bits 4|8] [--group 128] [--out <quant.bin>]\n"
               << "  --help   Show this help\n";
 }
 
@@ -76,11 +107,19 @@ int main(int argc, char* argv[]) {
         trainer.train(ds, &vds);
     } else trainer.train(ds);
     if (do_quant) {
-        std::cout<<"[train] quantizing to int8...\n";
-        quantize_model(model);
+        int bits = std::stoi(args.get("bits", "8"));
+        size_t group = std::stoul(args.get("group", "128"));
+        if (bits != 4 && bits != 8) { std::cerr << "[train] --bits must be 4 or 8\n"; return 1; }
+        apply_quantize_flags(model, bits, group);
     }
     std::string ckpt = args.get("checkpoint", "checkpoints/model.bin");
+    std::string qout = args.get("out", "");
     trainer.save_checkpoint(ckpt);
+    if (do_quant && !qout.empty() && qout != ckpt) {
+        // re-save quantized weights to --out (ckpt above already has them; copy path)
+        model.save(qout);
+        std::cout << "[train] quantized copy saved to " << qout << "\n";
+    }
     std::cout<<"[train] done, saved "<<ckpt<<(do_quant?" (quantized)":"")<<"\n";
     return 0;
 } else if (cmd == "generate") {
@@ -108,8 +147,12 @@ int main(int argc, char* argv[]) {
         model.load(ckpt);
     }
     if (args.has("quantize")) {
-        std::cout<<"[generate] quantizing model to int8 for inference\n";
-        quantize_model(model);
+        int bits = std::stoi(args.get("bits", "8"));
+        size_t group = std::stoul(args.get("group", "128"));
+        if (bits != 4 && bits != 8) { std::cerr << "[generate] --bits must be 4 or 8\n"; return 1; }
+        apply_quantize_flags(model, bits, group);
+        std::string qout = args.get("out", "");
+        if (!qout.empty()) { model.save(qout); std::cout << "[generate] quantized saved to " << qout << "\n"; }
     }
     llm::Tokenizer tok(256);
     auto ids = tok.encode(prompt);

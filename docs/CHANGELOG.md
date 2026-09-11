@@ -104,4 +104,8 @@
 - F54 GGUF quant: Q8_0/Q4_0 block-32 codecs + `save_gguf_quant` + load dequant (`gguf.h/cpp`), q8 err 0.0003<0.05, greedy identical, `test_gguf_quant` (also fixed assert-elided save/load trap).
 - F55 Sparse: `Tensor::matmul_sparse` CSR over B rows (exact, 0.0 diff), `test_sparse_prune`.
 - F57 2:4: `prune_2to4/verify_2to4` top-2 per group of 4, ppl 2.7024→2.7029, `test_sparse_prune`.
+- F56 Distill cache: `cache_teacher_logits/load_cached_logits/distill_step_cached`, cached≡live grads 0.0, `test_distill_cache`.
+- F58 Calib: `data/calib/calib.txt` 1k lines + `scripts/calibrate.py` byte-freq scales (113 bytes, --check).
+- F59 Gate: `test_quant_gate` calib ppl rel 8e-6<5%, 4-bit err 0.002<0.5 + `.github/workflows/quant.yml`.
+- F60 CLI: `generate/train --quantize --bits 4|8 --group 128 --out` with mean_abs_delta verify. Track F complete (10/10).
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.

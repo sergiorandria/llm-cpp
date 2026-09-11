@@ -1,0 +1,21 @@
+name: quant-gate
+on:
+  push:
+    paths: ["src/quantize.cpp", "src/gptq.cpp", "src/gguf.cpp", "tests/test_quant_gate.cpp"]
+  pull_request:
+    paths: ["src/quantize.cpp", "src/gptq.cpp", "src/gguf.cpp"]
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+      - name: build gate tests
+        run: cmake --build build -j4 --target test_quant_gate test_int8_infer test_gptq test_gguf_quant
+      - name: F59 gate (int8 ppl drift <5%, 4-bit err <0.5)
+        run: ./build/tests/test_quant_gate
+      - name: related quant suites
+        run: ctest --test-dir build -R "int8|gptq|gguf_quant|quantize" --output-on-failure
+      - name: calib check
+        run: python3 scripts/calibrate.py --check
