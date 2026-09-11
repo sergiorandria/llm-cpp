@@ -69,9 +69,9 @@ void Tokenizer::load(const std::string& path) {
 }
 
 void Tokenizer::train(const std::string& text, size_t num_merges){
-    // Real BPE: iteratively merge most frequent adjacent pair
+    // Real BPE: iteratively merge most frequent adjacent pair (byte-level, UTF-8 safe)
     std::vector<std::string> words;
-    for (char c: text) words.emplace_back(1,c);
+    for (unsigned char c: text) words.emplace_back(1, char(c));
     // naive but correct for small text
     for(size_t iter=0; iter<num_merges && vocab_.size()<vocab_size_; ++iter){
         std::unordered_map<std::string,int> freq;

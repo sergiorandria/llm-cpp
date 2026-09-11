@@ -55,7 +55,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 
 ## B. Tokenizer & Data pipeline (B11–B20)
 
-- [ ] **B11 UTF-8 correctness** — `src/tokenizer.cpp`.
+- [x] **B11 UTF-8 correctness** — `src/tokenizer.cpp`.
   `encode` must not split multi-byte codepoints at char level; `decode` must emit valid UTF-8.
   Test: Malagasy corpus (`data/malagasy/processed/input.txt`) roundtrip byte-exact.
 - [ ] **B12 HF `vocab.json`+`merges.txt` compat** — `src/tokenizer.cpp`, `include/llm/tokenizer.h`.
