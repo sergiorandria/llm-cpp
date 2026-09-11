@@ -40,4 +40,6 @@ public:
     static bool default_decay(const Tensor& p) { return p.shape.size() > 1; }
 private: float wd_;
 };
+// A05: shared global-norm clipping. Scales grads in place; returns pre-clip total norm.
+float clip_by_global_norm(std::vector<Tensor>& grads, float max_norm);
 }

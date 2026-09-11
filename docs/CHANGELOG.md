@@ -55,3 +55,4 @@
 - A02 Grad-check harness: `tests/grad_check.h` central `max_fd_error`, `test_grad_check` covers matmul/layernorm/rmsnorm <2e-2.
 - A03 CE backward: `cross_entropy_backward(logits, targets, smoothing)` (`loss.h/cpp`), `TrainConfig::label_smoothing`, `Trainer::train_step` uses it, `test_ce_backward` row-sum=0 + smoothing.
 - A04 AdamW: decoupled `p -= lr*wd*p` with `wd_` (was hardcoded 0.01*wd), auto-skip 1D bias/norm + explicit flags, `test_adamw` decay + Rosenbrock.
+- A05 Clip helper: `clip_by_global_norm(grads, max)` shared (`optimizer.h/cpp`), `Trainer::clip_grads` delegates, `test_clip_norm`.

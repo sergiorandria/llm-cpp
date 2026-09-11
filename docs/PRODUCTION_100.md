@@ -34,7 +34,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 - [x] **A04 AdamW bias-correction + decoupled decay** — `src/optimizer.cpp`.
   Verify `m_hat/(sqrt(v_hat)+eps)` + decay only on weights (not biases/norms via name filter).
   Test `test_adamw.cpp`: 10 steps on Rosenbrock decreases loss, norms excluded.
-- [ ] **A05 Global-norm grad clipping** — `src/trainer.cpp` (+ `optimizer.h` helper `clip_grad_norm_`).
+- [x] **A05 Global-norm grad clipping** — `src/trainer.cpp` (+ `optimizer.h` helper `clip_grad_norm_`).
   Already asserted in `test_grad_clip.cpp`; extract to shared `clip_by_global_norm(params, 1.0)`.
   Test: norm>1 scaled to 1, norm<1 untouched.
 - [ ] **A06 Dropout determinism** — `src/tensor.cpp:dropout`.

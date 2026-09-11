@@ -105,14 +105,6 @@ void Trainer::save_checkpoint(const std::string& path) {
     model_.save(path);
 }
 void Trainer::clip_grads(std::vector<Tensor>& grads) {
-    float total = 0;
-    for (auto& g : grads)
-        for (float v : g.data) total += v * v;
-    total = std::sqrt(total);
-    if (total > cfg_.grad_clip) {
-        float scale = cfg_.grad_clip / total;
-        for (auto& g : grads)
-            for (float& v : g.data) v *= scale;
-    }
+    clip_by_global_norm(grads, cfg_.grad_clip);
 }
 }  // namespace llm

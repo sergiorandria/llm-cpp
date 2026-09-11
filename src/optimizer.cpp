@@ -38,4 +38,16 @@ void AdamW::step(std::vector<Tensor*>& params, const std::vector<Tensor>& grads,
     }
     Adam::step(params, grads);
 }
+float clip_by_global_norm(std::vector<Tensor>& grads, float max_norm) {
+    double total = 0;
+    for (auto& g : grads)
+        for (float v : g.data) total += (double)v * v;
+    total = std::sqrt(total);
+    if (total > max_norm && total > 0) {
+        float scale = max_norm / (float)total;
+        for (auto& g : grads)
+            for (float& v : g.data) v *= scale;
+    }
+    return (float)total;
+}
 }
