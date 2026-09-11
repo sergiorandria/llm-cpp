@@ -140,3 +140,5 @@ add_executable(test_int8_infer test_int8_infer.cpp ../src/quantize.cpp ../src/mo
 add_test(NAME int8_infer COMMAND test_int8_infer)
 add_executable(test_int8_dtype test_int8_dtype.cpp ../src/quantize.cpp ../src/tensor.cpp ../src/model.cpp ../src/attention.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp)
 add_test(NAME int8_dtype COMMAND test_int8_dtype)
+add_executable(test_gptq_awq test_gptq_awq.cpp ../src/gptq.cpp ../src/checkpoint.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp)
+add_test(NAME gptq_awq COMMAND test_gptq_awq)

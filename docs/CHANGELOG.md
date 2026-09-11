@@ -99,4 +99,6 @@
 - E50 Int8 GEMM: fused `matmul_int8(act, wq*scale)` (no dequant pass, err 6e-8), model ppl +0.0004% (<2%), `test_int8_infer`. Track E complete (10/10).
 - F51 Int8 dtype: `DType::I8` + `idata/scale` (`tensor.h/cpp`), folded-scale matmul dispatch, fp32-only ops throw, `quantize_int8` returns real I8, `test_int8_dtype`.
 - Build: 16 test targets missing `utils.cpp` (latent since A06 global_seed) + `optimizer.cpp` for rlhf/pipeline — fixed, 63/63 green.
+- F52 GPTQ persist: `quantize_model_4bit/save_gptq/load_gptq` (magic GPTQ v1, per-param q+scale+group), loaded-scale err 0.002 <0.5.
+- F53 AWQ: `channel_act_mag` + `awq_rescale_for_quant` (salient-channel protect, fp-exact via inv), `test_gptq_awq`.
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.

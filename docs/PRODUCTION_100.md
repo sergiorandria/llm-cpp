@@ -164,9 +164,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 
 - [x] **F51 Int8 Tensor dtype** — `include/llm/tensor.h:enum class DType{F32,I8}` + `Tensor{dtype,int8_data,scale}`.
   Migrate `quantize_model()` off float-shadow. Test: `dtype==I8` tensors reject fp32-only ops with clear error.
-- [ ] **F52 GPTQ scale persistence** — `src/gptq.cpp`, `src/checkpoint.cpp` binary v4.
+- [x] **F52 GPTQ scale persistence** — `src/gptq.cpp`, `src/checkpoint.cpp` binary v4.
   Save per-group `scale_out` alongside qlevels. Test: save→load→dequant error still <0.5.
-- [ ] **F53 AWQ scaling** — `src/gptq.cpp` (new `awq_scale(model, calib_data)`).
+- [x] **F53 AWQ scaling** — `src/gptq.cpp` (new `awq_scale(model, calib_data)`).
   Activation-aware per-channel scale before quant. Test: AWQ ppl ≤ naive int8 ppl on calib set.
 - [ ] **F54 GGUF Q4_K / Q8_0 types** — `src/gguf.cpp` extend beyond f32.
   Write `GGML_TYPE_Q4_K` blocks + dequant on load. Test: Q8_0 roundtrip err <0.05.
