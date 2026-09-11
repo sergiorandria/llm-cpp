@@ -57,3 +57,5 @@
 - A04 AdamW: decoupled `p -= lr*wd*p` with `wd_` (was hardcoded 0.01*wd), auto-skip 1D bias/norm + explicit flags, `test_adamw` decay + Rosenbrock.
 - A05 Clip helper: `clip_by_global_norm(grads, max)` shared (`optimizer.h/cpp`), `Trainer::clip_grads` delegates, `test_clip_norm`.
 - A06 Determinism: `set_global_seed/global_seed` (`utils.h/cpp`), seeded sampling overloads (`sampling.h/cpp`), `test_dropout_seed` same-seed identical.
+- A07 NaN guard: `has_nonfinite(grads)` + `Trainer::skipped_steps`, skips optimizer on non-finite, `test_nan_guard`.
+- A09 Loss scale: `TrainConfig::loss_scale` scale-dlogits/unscale-grads, `test_nan_guard` 1024x ≡ 1x.

@@ -75,6 +75,7 @@ float Trainer::train_step(const std::vector<int>& batch) {
     // Real backward: zero grads, compute dlogits, backprop through entire model
     model_.zero_grad();
     Tensor dlogits = cross_entropy_backward(logits, batch, cfg_.label_smoothing);
+    if (cfg_.loss_scale != 1.0f) dlogits = dlogits.scale(cfg_.loss_scale); // A09
     model_.backward(dlogits, batch, hidden);
     // Collect grads from parameters' grad fields
     auto params = model_.parameters();
@@ -85,6 +86,13 @@ float Trainer::train_step(const std::vector<int>& batch) {
         if (p->grad.size() == p->data.size()) g.data = p->grad;
         // else stays zero (should have been set by backward)
         grads.push_back(std::move(g));
+    }
+    if (cfg_.loss_scale != 1.0f) // A09: unscale before clip/optimizer
+        for (auto& g : grads) for (auto& v : g.data) v /= cfg_.loss_scale;
+    if (has_nonfinite(grads)) { // A07: skip step, keep last good params
+        ++skipped_;
+        std::cerr << "[trainer] non-finite grad at step " << step_ << " — skipping optimizer step\n";
+        return loss;
     }
     clip_grads(grads);
     float lr = sched_.get_lr(step_);
@@ -103,6 +111,12 @@ float Trainer::evaluate(Dataset& ds) {
 }
 void Trainer::save_checkpoint(const std::string& path) {
     model_.save(path);
+}
+bool has_nonfinite(const std::vector<Tensor>& grads) {
+    for (auto& g : grads)
+        for (float v : g.data)
+            if (!std::isfinite(v)) return true;
+    return false;
 }
 void Trainer::clip_grads(std::vector<Tensor>& grads) {
     clip_by_global_norm(grads, cfg_.grad_clip);

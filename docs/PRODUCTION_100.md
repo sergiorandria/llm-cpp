@@ -40,13 +40,13 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 - [x] **A06 Dropout determinism** — `src/tensor.cpp:dropout`.
   Thread `std::mt19937& rng` everywhere (attention, FFN); add `set_global_seed(seed)`.
   Test: same seed → identical forward; different seed → differs w.p. high.
-- [ ] **A07 NaN/Inf detector in train_step** — `src/trainer.cpp`.
+- [x] **A07 NaN/Inf detector in train_step** — `src/trainer.cpp`.
   After `backward()`, scan `grad` for non-finite; on hit skip optimizer step + log + counter.
   Test: inject NaN grad, assert step skipped and counter++.
 - [ ] **A08 Deterministic mode flag** — `include/llm/model.h:Config{deterministic=false}`,
   `src/model.cpp`, `CMakeLists.txt` (`-DDETERMINISTIC` disables OpenMP nondeterminism).
   Test: two runs `TinyStories 50 steps` bit-identical when on.
-- [ ] **A09 Loss-scale guard for fp16 path** — `src/trainer.cpp`.
+- [x] **A09 Loss-scale guard for fp16 path** — `src/trainer.cpp`.
   Add `TrainConfig{loss_scale=1.0}`; scale loss before backward, unscale grads, skip on overflow.
   Test: scale=1024 finite path equals scale=1 within 1e-4.
 - [ ] **A10 Attention numerical parity** — `src/attention.cpp:100` vs `flash_attention.cpp:44`.
