@@ -162,7 +162,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 
 ## F. Quant & compression (F51–F60)
 
-- [ ] **F51 Int8 Tensor dtype** — `include/llm/tensor.h:enum class DType{F32,I8}` + `Tensor{dtype,int8_data,scale}`.
+- [x] **F51 Int8 Tensor dtype** — `include/llm/tensor.h:enum class DType{F32,I8}` + `Tensor{dtype,int8_data,scale}`.
   Migrate `quantize_model()` off float-shadow. Test: `dtype==I8` tensors reject fp32-only ops with clear error.
 - [ ] **F52 GPTQ scale persistence** — `src/gptq.cpp`, `src/checkpoint.cpp` binary v4.
   Save per-group `scale_out` alongside qlevels. Test: save→load→dequant error still <0.5.

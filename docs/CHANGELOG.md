@@ -97,4 +97,6 @@
 - E48 Spec gate: `test_spec_gate` equivalence + wall-clock (tiny scale speedup=0.39 — slower; 2x claim needs draft<<target), dashboard entry.
 - E49 Beam: `BeamConfig{len_penalty, early_stop}` + `beam_search_cfg`, legacy delegates, `test_beam_pen`.
 - E50 Int8 GEMM: fused `matmul_int8(act, wq*scale)` (no dequant pass, err 6e-8), model ppl +0.0004% (<2%), `test_int8_infer`. Track E complete (10/10).
+- F51 Int8 dtype: `DType::I8` + `idata/scale` (`tensor.h/cpp`), folded-scale matmul dispatch, fp32-only ops throw, `quantize_int8` returns real I8, `test_int8_dtype`.
+- Build: 16 test targets missing `utils.cpp` (latent since A06 global_seed) + `optimizer.cpp` for rlhf/pipeline — fixed, 63/63 green.
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.

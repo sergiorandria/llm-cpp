@@ -35,7 +35,36 @@ void Tensor::compute_strides() {
     }
 }
 
+void Tensor::require_f32(const char* op) const {
+    if (dtype == DType::I8) throw std::runtime_error(std::string(op) + " requires F32 tensor (dequantize first)");
+}
+
+void Tensor::quantize_to_int8() {
+    require_f32("quantize_to_int8");
+    float maxv = 0;
+    for (float v : data) maxv = std::max(maxv, std::abs(v));
+    i8_scale = maxv / 127.0f + 1e-8f;
+    idata.resize(data.size());
+    for (size_t i = 0; i < data.size(); ++i) {
+        float q = std::round(data[i] / i8_scale);
+        q = std::max(-127.0f, std::min(127.0f, q));
+        idata[i] = (int8_t)q;
+    }
+    data.clear();
+    data.shrink_to_fit();
+    dtype = DType::I8;
+}
+
+Tensor Tensor::dequantized() const {
+    if (dtype == DType::F32) return *this;
+    Tensor out(shape, 0.0f);
+    out.data.resize(idata.size());
+    for (size_t i = 0; i < idata.size(); ++i) out.data[i] = (float)idata[i] * i8_scale;
+    return out;
+}
+
 void Tensor::randn(float mean, float std) {
+    require_f32("randn");
 #ifdef USE_NUMPY_CPP
     randn_np(mean, std, 42);
 #else
@@ -47,6 +76,7 @@ void Tensor::randn(float mean, float std) {
 
 #ifdef USE_NUMPY_CPP
 np::ndarray<float> Tensor::to_ndarray() const {
+    require_f32("to_ndarray");
     std::vector<int> np_shape;
     np_shape.reserve(shape.size());
     for (auto s : shape) np_shape.push_back(static_cast<int>(s));
@@ -70,6 +100,7 @@ Tensor Tensor::from_ndarray(const np::ndarray<float>& arr) {
 }
 
 Tensor Tensor::matmul_np(const Tensor& other) const {
+    require_f32("matmul_np");
     auto a = to_ndarray();
     auto b = other.to_ndarray();
     // np::linalg::matmul uses blocked GEMM + SIMD + threading
@@ -101,6 +132,27 @@ const float& Tensor::operator()(size_t i, size_t j) const {
 }
 
 Tensor Tensor::matmul(const Tensor& other) const {
+    assert(shape.size() == 2 && other.shape.size() == 2);
+    assert(shape[1] == other.shape[0]);
+    if (dtype == DType::I8 || other.dtype == DType::I8) {
+        // F51: folded-scale int8 path (no materialized dequant pass).
+        //ij loop with per-operand scales (F32 operand scale = 1).
+        Tensor out({shape[0], other.shape[1]}, 0.0f);
+        float sa = (dtype == DType::I8) ? i8_scale : 1.0f;
+        float sb = (other.dtype == DType::I8) ? other.i8_scale : 1.0f;
+        for (size_t i = 0; i < shape[0]; ++i) {
+            for (size_t k = 0; k < shape[1]; ++k) {
+                float a = (dtype == DType::I8) ? (float)idata[i * shape[1] + k] : data[i * strides[0] + k * strides[1]];
+                for (size_t j = 0; j < other.shape[1]; ++j) {
+                    float b = (other.dtype == DType::I8) ? (float)other.idata[k * other.shape[1] + j]
+                                                         : other.data[k * other.strides[0] + j * other.strides[1]];
+                    out.data[i * out.shape[1] + j] += a * b;
+                }
+            }
+        }
+        for (auto& v : out.data) v *= sa * sb;
+        return out;
+    }
 #ifdef USE_OPENBLAS
     assert(shape.size() == 2 && other.shape.size() == 2);
     assert(shape[1] == other.shape[0]);
@@ -138,6 +190,7 @@ Tensor Tensor::matmul(const Tensor& other) const {
 }
 
 Tensor Tensor::transpose() const {
+    require_f32("transpose");
 #ifdef USE_NUMPY_CPP
     // numpy-cpp: view-based transpose (shared storage, SIMD strides)
     auto a = to_ndarray();
@@ -153,6 +206,7 @@ Tensor Tensor::transpose() const {
 }
 
 Tensor Tensor::softmax(int dim) const {
+    require_f32("softmax");
     Tensor out = *this;
     if (shape.size() == 2) {
 // softmax over last dim (j)
@@ -174,6 +228,7 @@ Tensor Tensor::softmax(int dim) const {
 }
 
 Tensor Tensor::layernorm(const Tensor* gamma, const Tensor* beta, float eps) const {
+    require_f32("layernorm");
     assert(shape.size() == 2);
     Tensor out(shape, 0.0f);
 #ifdef _OPENMP
@@ -200,29 +255,38 @@ Tensor Tensor::layernorm(const Tensor* gamma, const Tensor* beta, float eps) con
 }
 
 Tensor Tensor::add(const Tensor& other) const {
+    require_f32("add");
     assert(shape == other.shape);
     Tensor out(shape, 0.0f);
     for (size_t i = 0; i < data.size(); ++i) out.data[i] = data[i] + other.data[i];
     return out;
 }
 Tensor Tensor::sub(const Tensor& other) const {
+    require_f32("sub");
     assert(shape == other.shape);
     Tensor out(shape, 0.0f);
     for (size_t i = 0; i < data.size(); ++i) out.data[i] = data[i] - other.data[i];
     return out;
 }
 Tensor Tensor::mul(const Tensor& other) const {
+    require_f32("mul");
     assert(shape == other.shape);
     Tensor out(shape, 0.0f);
     for (size_t i = 0; i < data.size(); ++i) out.data[i] = data[i] * other.data[i];
     return out;
 }
 Tensor Tensor::scale(float s) const {
+    if (dtype == DType::I8) {  // exact: fold into scale, levels untouched
+        Tensor out = *this;
+        out.i8_scale *= s;
+        return out;
+    }
     Tensor out(shape, 0.0f);
     for (size_t i = 0; i < data.size(); ++i) out.data[i] = data[i] * s;
     return out;
 }
 Tensor Tensor::gelu() const {
+    require_f32("gelu");
     Tensor out(shape, 0.0f);
     for (size_t i = 0; i < data.size(); ++i) {
         float x = data[i];
@@ -233,6 +297,7 @@ Tensor Tensor::gelu() const {
     return out;
 }
 Tensor Tensor::silu() const {
+    require_f32("silu");
     Tensor out(shape, 0.0f);
     for (size_t i = 0; i < data.size(); ++i) {
         float x = data[i];
@@ -241,6 +306,7 @@ Tensor Tensor::silu() const {
     return out;
 }
 Tensor Tensor::dropout(float p, std::mt19937& rng) const {
+    require_f32("dropout");
     if (p == 0.0f) return *this;
     Tensor out(shape, 0.0f);
     std::bernoulli_distribution dist(1.0 - p);
@@ -251,6 +317,7 @@ Tensor Tensor::dropout(float p, std::mt19937& rng) const {
     return out;
 }
 float Tensor::cross_entropy(const Tensor& target) const {
+    require_f32("cross_entropy");
     // naive: this = logits [N, V], target = indices [N] stored as shape [N,1] or [N]
     assert(shape.size() == 2);
     float loss = 0;
@@ -267,6 +334,7 @@ float Tensor::cross_entropy(const Tensor& target) const {
     return loss / shape[0];
 }
 size_t Tensor::argmax(size_t row) const {
+    require_f32("argmax");
     assert(row < shape[0]);
     size_t best = 0;
     float bestv = (*this)(row, 0);
@@ -376,6 +444,7 @@ Tensor::LayernormGrad Tensor::layernorm_backward(const Tensor& grad_out, const T
 }
 
 Tensor Tensor::rmsnorm(const Tensor* weight, float eps) const {
+    require_f32("rmsnorm");
     assert(shape.size() == 2);
     Tensor out(shape, 0.0f);
 #ifdef _OPENMP

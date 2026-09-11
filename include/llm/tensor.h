@@ -3,7 +3,9 @@
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <random>
+#include <stdexcept>
 #include <vector>
 
 #ifdef USE_NUMPY_CPP
@@ -15,12 +17,20 @@
 
 namespace llm {
 
+// F51: storage dtype. I8 holds rounded int levels in idata + per-tensor scale;
+// data is empty for I8 (use dequantized() for an F32 copy). Only matmul and the
+// quantize/dequantize helpers accept I8; other ops throw with a clear message.
+enum class DType { F32, I8 };
+
 class Tensor {
    public:
     std::vector<float> data;
     mutable std::vector<float> grad;  // for autograd (mutable so const backward can accumulate)
     std::vector<size_t> shape;
     std::vector<size_t> strides;
+    DType dtype = DType::F32;
+    std::vector<int8_t> idata;  // valid iff dtype == I8
+    float i8_scale = 1.0f;      // valid iff dtype == I8
 
     Tensor() = default;
     explicit Tensor(std::vector<size_t> shape_, float fill = 0.0f);
@@ -67,6 +77,11 @@ class Tensor {
     static Tensor ones(std::vector<size_t> shape) {
         return Tensor(shape, 1.0f);
     }
+    // ── F51 int8 helpers ──
+    bool is_int8() const { return dtype == DType::I8; }
+    void require_f32(const char* op) const;  // throws std::runtime_error on I8
+    void quantize_to_int8();                  // F32 -> I8 in place (per-tensor scale)
+    Tensor dequantized() const;               // I8 -> F32 copy (throws if already F32? no: returns *this)
     void print(const std::string& name = "") const;
     std::vector<size_t> get_shape() const {
         return shape;
