@@ -43,6 +43,14 @@ int main() {
     // scale() on I8 folds into scale exactly
     auto qs = Wq.scale(2.0f);
     assert(qs.is_int8() && std::fabs(qs.i8_scale - 2 * Wq.i8_scale) < 1e-7);
+    // I88: I8xI8 integer MACs == fp32 within quant bound
+    llm::Tensor Aq = A;
+    Aq.quantize_to_int8();
+    auto y_qq = Aq.matmul(Wq);
+    float md2 = 0;
+    for (size_t i = 0; i < y_qq.data.size(); ++i) md2 = std::max(md2, std::fabs(y_qq.data[i]-y_fp.data[i]));
+    std::cout << "i8xi8 maxd=" << md2 << "\n";
+    assert(md2 < 0.3f);
     std::cout << "int8 dtype test passed\n";
     return 0;
 }

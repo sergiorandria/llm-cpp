@@ -131,5 +131,7 @@
 - FIX (critical): `Tensor::from_ndarray` raw-copied shared storage, silently un-transposing numpy views — every `matmul(K.transpose())` under USE_NUMPY_CPP=ON computed wrong scores (found via I84: flash-vs-naive 0.04). Now copies logical order (`arr(i,j)` when non-contiguous), flash-vs-naive 7e-8. `test_transpose` regression. NOTE: all pre-fix attention numerics/ppl under numpy builds are suspect; OFF builds were always correct.
 - I84 FlashAttention-2: `flash_attention_full` online-softmax O(D+block) (≡ naive/fa1 7e-8), T>128 dispatch switched, `test_flash2` causal+noncausal.
 - I85/I86/I90 Memory: `TensorPool` shape-keyed recycling + `KVCache::set_pool` evict-to-pool (100 cycles: 6 misses, 596 hits); 64B-aligned `Tensor::data/grad` via AlignedAllocator (`test_pool` alignment + exact matmul). Also fixed pool.h includes-inside-namespace breakage.
+- I87 Backend: `backend.h` CPU/CUDA abstraction + `-DUSE_CUDA=ON` (warns + CPU fallback without toolkit), `test_backend` graceful CPU.
+- I88 Int8 MACs: I8×I8 accumulates in int32 with single scale (cublas/s8 hook documented), mixed keeps folded-float; i8xi8 err 0.003, `test_int8_dtype` extended. Fixed 51 test targets missing pool.cpp.
 - Build: `profiling.cpp` added to 45 test targets + llm-c-api (new PROFILE refs).
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.

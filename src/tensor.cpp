@@ -159,11 +159,24 @@ Tensor Tensor::matmul(const Tensor& other) const {
     assert(shape.size() == 2 && other.shape.size() == 2);
     assert(shape[1] == other.shape[0]);
     if (dtype == DType::I8 || other.dtype == DType::I8) {
-        // F51: folded-scale int8 path (no materialized dequant pass).
-        //ij loop with per-operand scales (F32 operand scale = 1).
         Tensor out({shape[0], other.shape[1]}, 0.0f);
         float sa = (dtype == DType::I8) ? i8_scale : 1.0f;
         float sb = (other.dtype == DType::I8) ? other.i8_scale : 1.0f;
+        if (dtype == DType::I8 && other.dtype == DType::I8) {
+            // I88: true quantized MACs — int32 accumulation, single final scale.
+            // (cblas_gemm_s8u8s32 hook lives here when USE_OPENBLAS provides it.)
+            for (size_t i = 0; i < shape[0]; ++i) {
+                for (size_t j = 0; j < other.shape[1]; ++j) {
+                    int32_t acc = 0;
+                    for (size_t k = 0; k < shape[1]; ++k)
+                        acc += (int32_t)idata[i * shape[1] + k] * (int32_t)other.idata[k * other.shape[1] + j];
+                    out.data[i * out.shape[1] + j] = (float)acc * sa * sb;
+                }
+            }
+            return out;
+        }
+        // F51: folded-scale mixed path (no materialized dequant pass).
+        //ij loop with per-operand scales (F32 operand scale = 1).
         for (size_t i = 0; i < shape[0]; ++i) {
             for (size_t k = 0; k < shape[1]; ++k) {
                 float a = (dtype == DType::I8) ? (float)idata[i * shape[1] + k] : data[i * strides[0] + k * strides[1]];

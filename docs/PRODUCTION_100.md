@@ -246,9 +246,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   Test: 100 sequential generations RSS stable (no growth).
 - [x] **I86 Tensor memory pool** — `src/tensor.cpp:TensorPool{acquire(shape), release}` for activations.
   `forward_with_hidden` reuses buffers. Test: 100 forwards no new `malloc` (count via hook).
-- [ ] **I87 CUDA backend abstraction** — `include/llm/backend.h` (new) + `cmake/FindCUDA.cmake` + `-DUSE_CUDA=ON`.
+- [x] **I87 CUDA backend abstraction** — `include/llm/backend.h` (new) + `cmake/FindCUDA.cmake` + `-DUSE_CUDA=ON`.
   `Tensor::matmul` dispatches CPU/CUDA; CPU-only build unchanged. Test: skipped gracefully when no GPU.
-- [ ] **I88 Quantized BLAS dispatch** — `src/tensor.cpp:100` extend `USE_OPENBLAS` path to `cblas_gemm_s8u8s32`
+- [x] **I88 Quantized BLAS dispatch** — `src/tensor.cpp:100` extend `USE_OPENBLAS` path to `cblas_gemm_s8u8s32`
   when `F51` int8 present; fallback blocked int8 GEMM. Test: int8 GEMM ≡ fp32 within quant bound.
 - [ ] **I89 Infer benchmark + gate** — `scripts/bench_infer.cpp` (new) `tokens/sec, ms/token, p50/p95`.
   `.github/workflows/bench.yml` fails on >10% regression vs `docs/BENCHMARK_DASHBOARD.md` baseline.
