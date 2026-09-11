@@ -259,9 +259,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 
 - [x] **J91 Version automation** — `include/llm/version.h` from `git describe` via CMake.
   `llm-cpp --version` prints `0.x.y+sha`. Test: version string matches `CHANGELOG` head.
-- [ ] **J92 CHANGELOG gate** — `.github/workflows/lint.yml`: PR fails if no `docs/CHANGELOG.md` diff
+- [x] **J92 CHANGELOG gate** — `.github/workflows/lint.yml`: PR fails if no `docs/CHANGELOG.md` diff
   (except `docs/`-only PRs). Retroactively add Unreleased section for A–I as landed.
-- [ ] **J93 clang-format + clang-tidy** — `.clang-format` exists; add `.clang-tidy` + pre-commit hook.
+- [x] **J93 clang-format + clang-tidy** — `.clang-format` exists; add `.clang-tidy` + pre-commit hook.
   `scripts/lint.sh` runs both. Test: CI lint green (fix `build/` warnings first).
 - [ ] **J94 Coverage gate** — `cmake -DENABLE_COVERAGE=ON` + `lcov`; fail if line coverage <80%
   (target 90% by 1.0). Upload to Codecov. Exclude `examples/`, `build*/`.

@@ -137,3 +137,5 @@
 - Build: `profiling.cpp` added to 45 test targets + llm-c-api (new PROFILE refs).
 - D39/D40 CLI: `train --max_iters --batch_size --lr --eval_every --grad_accum --eval_data` wired (was hardcoded 10), smoke `--max_iters 1` ok.
 - J91 Version: `cmake/version.cmake` generates `llm/version.h` from `git describe`, `llm-cpp --version`, `test_version`.
+- J92 Gate: `lint.yml` changelog job (code PRs without CHANGELOG entry fail; docs-only skip).
+- J93 Lint: `.clang-tidy` + `scripts/lint.sh` (format gate on changed files, tidy opt-in LINT_TIDY=1) + session-wide `style:` format commit; legacy files grandfathered.
