@@ -92,3 +92,5 @@ add_executable(test_nan_guard test_nan_guard.cpp ../src/model.cpp ../src/attenti
 add_test(NAME nan_guard COMMAND test_nan_guard)
 add_executable(test_deterministic test_deterministic.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/trainer.cpp ../src/dataset.cpp ../src/optimizer.cpp ../src/scheduler.cpp ../src/loss.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/utils.cpp)
 add_test(NAME deterministic COMMAND test_deterministic)
+add_executable(test_attn_parity test_attn_parity.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/kv_cache.cpp)
+add_test(NAME attn_parity COMMAND test_attn_parity)

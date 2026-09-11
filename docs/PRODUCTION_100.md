@@ -49,7 +49,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 - [x] **A09 Loss-scale guard for fp16 path** — `src/trainer.cpp`.
   Add `TrainConfig{loss_scale=1.0}`; scale loss before backward, unscale grads, skip on overflow.
   Test: scale=1024 finite path equals scale=1 within 1e-4.
-- [ ] **A10 Attention numerical parity** — `src/attention.cpp:100` vs `flash_attention.cpp:44`.
+- [x] **A10 Attention numerical parity** — `src/attention.cpp:100` vs `flash_attention.cpp:44`.
   Test `test_attn_parity.cpp`: full vs incremental vs flash-incremental logits diff <1e-4
   for K_len in {1, 33, 129, 512} (covers `K_len>128` dispatch boundary).
 

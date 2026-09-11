@@ -60,3 +60,4 @@
 - A07 NaN guard: `has_nonfinite(grads)` + `Trainer::skipped_steps`, skips optimizer on non-finite, `test_nan_guard`.
 - A09 Loss scale: `TrainConfig::loss_scale` scale-dlogits/unscale-grads, `test_nan_guard` 1024x ≡ 1x.
 - A08 Deterministic: `GPT::Config::deterministic` + `TrainConfig::deterministic` (seed 42, OMP 1 thread), `test_deterministic` bit-identical.
+- A10 Attn parity: `test_attn_parity` full≡incr <1e-3 (T=8), flash-incr≡naive <1e-4 (K=150), T={33,129} finite. Track A complete (10/10).
