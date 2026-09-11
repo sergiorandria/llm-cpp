@@ -146,3 +146,4 @@
 - J98 Matrix: `ci.yml` gcc/clang x Debug/Release x numpy ON/OFF + OpenBLAS job.
 - J99 Release: `release.yml` on `v*` (tarball + smoke + docker image).
 - J100 Sign-off: `docs/PRODUCTION.md` checklist, numbers, known limits. 100/100 complete.
+- Fix: `llm-c-api` missing `pool.cpp` (undefined TensorPool symbols; caught by fresh-lib pybind rerun).
