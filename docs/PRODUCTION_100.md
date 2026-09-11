@@ -83,7 +83,7 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
 
 ## C. Architecture parity (C21–C30)
 
-- [ ] **C21 GQA generalize MQA** — `include/llm/transformer.h:Config{n_kv_heads}`,
+- [x] **C21 GQA generalize MQA** — `include/llm/transformer.h:Config{n_kv_heads}`,
   `src/attention.cpp`, `src/mqa.cpp` (keep `mqa_forward` as `n_kv_heads=1` alias).
   Test: `n_kv_heads=n_heads` ≡ MHA; `=1` ≡ MQA; `=4` KV-cache 3× smaller.
 - [ ] **C22 RMSNorm config switch** — `include/llm/model.h:Config{norm=RMS|Layer}`.

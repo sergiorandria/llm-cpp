@@ -71,3 +71,4 @@
 - B18 Split: `train_val_split(tokens, ratio, seed)`, 900/100 contiguous.
 - B19 Downloader: `scripts/download_data.py` (tinystories/shakespeare, sha256, --dry-run).
 - B20 Fuzz corpus: `tests/fuzz_corpus/` (empty/invalid-utf8/malagasy/tiny), `fuzz_tokenizer` asserts byte-roundtrip. Track B complete (10/10), 45/45 green.
+- C21 GQA: `gqa_forward(x,Wq,Wk,Wv,nq,nkv,hd)` (`mqa.h/cpp`), nkv==1 ≡ `mqa_forward` <1e-4, `test_gqa`.
