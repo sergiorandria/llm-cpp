@@ -60,9 +60,9 @@ per commit; buffer-touching commits also run `ENABLE_SANITIZERS=ON`.
   Test: Malagasy corpus (`data/malagasy/processed/input.txt`) roundtrip byte-exact.
 - [x] **B12 HF `vocab.json`+`merges.txt` compat** — `src/tokenizer.cpp`, `include/llm/tokenizer.h`.
   Add `load_hf(vocab_path, merges_path)` + `save_hf(dir)`. Test: roundtrip our BPE equals HF ordering.
-- [ ] **B13 Streaming decode** — `include/llm/tokenizer.h:decode_incremental(ids, prev_bytes)`.
+- [x] **B13 Streaming decode** — `include/llm/tokenizer.h:decode_incremental(ids, prev_bytes)`.
   Buffer incomplete UTF-8 tail across `generate_streaming` callbacks. Test: emoji split across 2 tokens.
-- [ ] **B14 GPT-2 pre-tokenizer regex** — `src/tokenizer.cpp`.
+- [x] **B14 GPT-2 pre-tokenizer regex** — `src/tokenizer.cpp`.
   Add `split_pretokenize(text)` (`'s|'t|'re| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+`).
   Test `test_bpe_correctness.cpp` extension: `"Hello, world!"` splits as GPT-2.
 - [ ] **B15 Memmap dataset for large corpora** — `src/dataset.cpp`.
