@@ -1,24 +1,21 @@
 #include "llm/backend.h"
+#ifdef USE_CUDA
+#include <cuda_runtime_api.h>
+#endif
 namespace llm {
-Backend active_backend() {
-#ifdef USE_CUDA
-    return Backend::CUDA;
-#else
-    return Backend::CPU;
-#endif
-}
-const char* backend_name() {
-#ifdef USE_CUDA
-    return "cuda";
-#else
-    return "cpu";
-#endif
-}
 bool cuda_available() {
 #ifdef USE_CUDA
-    return true;
+    // Runtime probe: a USE_CUDA binary still runs (on CPU) where no GPU exists.
+    int n = 0;
+    return cudaGetDeviceCount(&n) == cudaSuccess && n > 0;
 #else
     return false;
 #endif
+}
+Backend active_backend() {
+    return cuda_available() ? Backend::CUDA : Backend::CPU;
+}
+const char* backend_name() {
+    return cuda_available() ? "cuda" : "cpu";
 }
 }  // namespace llm

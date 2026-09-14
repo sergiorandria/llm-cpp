@@ -1,5 +1,7 @@
 # Build
 build/
+build_*/
+build_san/
 cmake-build-*/
 out/
 
@@ -20,18 +22,29 @@ Makefile
 # Data & checkpoints (large)
 data/*.txt
 data/*.bin
+data/malagasy/raw/
+data/malagasy/processed/
 *.bin
 *.gguf
 checkpoints/
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
 *~
+.vscode/
+.ide/
 .clangd/
 .cache/
+
+# Python / tooling caches
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # OS
 .DS_Store

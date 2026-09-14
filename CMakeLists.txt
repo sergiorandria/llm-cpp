@@ -85,13 +85,21 @@ if(USE_OPENBLAS)
     endif()
 endif()
 
-# I87: CUDA backend (optional; CPU-only build unchanged when absent)
+# I87: CUDA backend (optional; CPU-only build unchanged when absent).
+# Real kernels: Tensor::matmul offloads large F32 GEMMs to cuBLAS (tensor.cpp),
+# with silent CPU fallback (no device / small / strided / error).
 option(USE_CUDA "Use CUDA backend for matmul (requires CUDAToolkit)" OFF)
 if(USE_CUDA)
     find_package(CUDAToolkit QUIET)
     if(CUDAToolkit_FOUND)
         target_link_libraries(llm-cpp PRIVATE CUDA::cudart CUDA::cublas)
-        target_compile_definitions(llm-cpp PRIVATE USE_CUDA=1)
+        target_compile_definitions(llm-cpp PRIVATE USE_CUDA=1 NP_ENABLE_CUDA=1)
+        # Propagate to targets defined below (llm-c-api, tests/, benches):
+        # they compile tensor.cpp/backend.cpp too and must agree on USE_CUDA.
+        # NP_ENABLE_CUDA lets numpy-cpp use real CUDA types + its cuBLAS path
+        # instead of dlopen stubs (avoids header conflicts with <cublas_v2.h>).
+        add_compile_definitions(USE_CUDA=1 NP_ENABLE_CUDA=1)
+        link_libraries(CUDA::cudart CUDA::cublas)
         message(STATUS "llm-cpp: USE_CUDA enabled — cublas")
     else()
         message(WARNING "USE_CUDA=ON but CUDAToolkit not found — staying on CPU")

@@ -6,6 +6,10 @@
 #ifdef USE_OPENBLAS
 #include <cblas.h>
 #endif
+#ifdef USE_CUDA
+#include <cublas_v2.h>
+#include <cuda_runtime_api.h>
+#endif
 #ifdef USE_NUMPY_CPP
 #include <np/linalg.hpp>
 #include <np/np.hpp>
@@ -13,6 +17,72 @@
 #endif
 
 namespace llm {
+
+#ifdef USE_CUDA
+namespace {
+// cuBLAS SGEMM offload for large F32 row-major matmuls. Never throws: any CUDA
+// failure (or no device) returns false and the caller falls back to CPU.
+// Per-call handle + buffers (no global state): thread-safe, correct on
+// single- or multi-GPU (uses device 0 implicitly).
+constexpr size_t kCudaMinMacs = 1024 * 1024;  // below this, PCIe xfer dwarfs GPU win
+
+bool cuda_device_present() {
+    // Magic static: thread-safe one-time runtime probe (binary also runs on CPU-only boxes).
+    static const bool present = [] {
+        int n = 0;
+        return cudaGetDeviceCount(&n) == cudaSuccess && n > 0;
+    }();
+    return present;
+}
+
+bool is_contiguous_rowmajor(const Tensor& t) {
+    return t.shape.size() == 2 && t.data.size() == t.shape[0] * t.shape[1] &&
+           t.strides.size() == 2 && t.strides[0] == t.shape[1] && t.strides[1] == 1;
+}
+
+bool try_cublas_sgemm(const Tensor& a, const Tensor& b, Tensor& out) {
+    if (!cuda_device_present()) return false;
+    const size_t m = a.shape[0], k = a.shape[1], n = b.shape[1];
+    if (m == 0 || k == 0 || n == 0) return false;
+    if (m * k * n < kCudaMinMacs) return false;  // small: CPU wins, skip xfer
+    if (!is_contiguous_rowmajor(a) || !is_contiguous_rowmajor(b)) return false;  // views: CPU
+
+    // Row-major C=A*B via column-major C^T=B^T*A^T: no-transpose SGEMM with A/B swapped.
+    float *d_a = nullptr, *d_b = nullptr, *d_c = nullptr;
+    cublasHandle_t handle = nullptr;
+    bool ok = false;
+    if (cudaMalloc((void**)&d_a, m * k * sizeof(float)) != cudaSuccess) goto done;
+    if (cudaMalloc((void**)&d_b, k * n * sizeof(float)) != cudaSuccess) goto done;
+    if (cudaMalloc((void**)&d_c, m * n * sizeof(float)) != cudaSuccess) goto done;
+    if (cudaMemcpy(d_a, a.data.data(), m * k * sizeof(float), cudaMemcpyHostToDevice) !=
+        cudaSuccess)
+        goto done;
+    if (cudaMemcpy(d_b, b.data.data(), k * n * sizeof(float), cudaMemcpyHostToDevice) !=
+        cudaSuccess)
+        goto done;
+    if (cublasCreate(&handle) != CUBLAS_STATUS_SUCCESS) goto done;
+    {
+        const float alpha = 1.0f, beta = 0.0f;
+        // (n,m,k) with B first: C^T(n x m) = B^T(n x k) * A^T(k x m), lda=n, ldb=k, ldc=n.
+        if (cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, (int)n, (int)m, (int)k, &alpha, d_b,
+                         (int)n, d_a, (int)k, &beta, d_c, (int)n) != CUBLAS_STATUS_SUCCESS)
+            goto done;
+        if (cudaDeviceSynchronize() != cudaSuccess) goto done;
+    }
+    out = Tensor({m, n}, 0.0f);
+    if (cudaMemcpy(out.data.data(), d_c, m * n * sizeof(float), cudaMemcpyDeviceToHost) !=
+        cudaSuccess)
+        goto done;
+    ok = true;
+done:
+    if (handle) cublasDestroy(handle);
+    if (d_a) cudaFree(d_a);
+    if (d_b) cudaFree(d_b);
+    if (d_c) cudaFree(d_c);
+    return ok;
+}
+}  // namespace
+#endif
 
 Tensor::Tensor(std::vector<size_t> shape_, float fill) : shape(std::move(shape_)) {
     compute_strides();
@@ -194,6 +264,14 @@ Tensor Tensor::matmul(const Tensor& other) const {
         for (auto& v : out.data) v *= sa * sb;
         return out;
     }
+#ifdef USE_CUDA
+    // Explicit opt-in GPU path: large contiguous F32 GEMMs go to cuBLAS;
+    // small/strided/failed cases silently use the CPU path below.
+    {
+        Tensor gpu_out;
+        if (try_cublas_sgemm(*this, other, gpu_out)) return gpu_out;
+    }
+#endif
 #ifdef USE_OPENBLAS
     assert(shape.size() == 2 && other.shape.size() == 2);
     assert(shape[1] == other.shape[0]);

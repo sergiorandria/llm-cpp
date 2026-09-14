@@ -3,6 +3,7 @@
 #include <cmath>
 #include <csignal>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <thread>
 
@@ -47,6 +48,46 @@ static void apply_quantize_flags(llm::GPT& model, int bits, size_t group) {
     }
     std::cout << "[quantize] bits=" << bits << " group=" << group
               << " mean_abs_delta=" << (n ? sum / n : 0) << "\n";
+}
+
+// Production CLI: numeric flags must never throw uncaught (std::stoi/stof abort
+// with SIGABRT on bad input). Strict full-string parsing, exit 1 with message.
+static bool cli_int(const std::string& s, const char* flag, int& out) {
+    try {
+        size_t pos = 0;
+        int v = std::stoi(s, &pos);
+        if (pos != s.size()) throw std::invalid_argument("trailing characters");
+        out = v;
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "error: --" << flag << " expects an integer, got '" << s << "'\n";
+        return false;
+    }
+}
+static bool cli_ulong(const std::string& s, const char* flag, unsigned long& out) {
+    try {
+        size_t pos = 0;
+        unsigned long v = std::stoul(s, &pos);
+        if (pos != s.size()) throw std::invalid_argument("trailing characters");
+        out = v;
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "error: --" << flag << " expects a non-negative integer, got '" << s << "'\n";
+        return false;
+    }
+}
+static bool cli_float(const std::string& s, const char* flag, float& out) {
+    try {
+        size_t pos = 0;
+        float v = std::stof(s, &pos);
+        if (pos != s.size()) throw std::invalid_argument("trailing characters");
+        if (!std::isfinite(v)) throw std::out_of_range("non-finite");
+        out = v;
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "error: --" << flag << " expects a number, got '" << s << "'\n";
+        return false;
+    }
 }
 
 void print_usage(const char* prog) {
@@ -111,16 +152,22 @@ int main(int argc, char* argv[]) {
         std::cout << "[train] model params " << model.num_parameters() << "\n";
         llm::Dataset ds(data_path, cfg.block_size);
         std::cout << "[train] dataset tokens " << ds.size() << "\n";
-        float lr = std::stof(args.get("lr", "6e-4"));
+        float lr = 6e-4f;
+        if (!cli_float(args.get("lr", "6e-4"), "lr", lr)) return 1;
         llm::AdamW optim(lr);
         llm::CosineScheduler sched(lr, 100, 5000);
         bool do_quant = args.has("quantize");
         // D40: real CLI flags (was hardcoded max_iters=10)
         llm::TrainConfig tcfg;
-        tcfg.max_iters = std::stoul(args.get("max_iters", "10"));
-        tcfg.batch_size = std::stoul(args.get("batch_size", "32"));
-        tcfg.eval_interval = std::stoul(args.get("eval_every", "500"));
-        tcfg.grad_accum_steps = std::stoul(args.get("grad_accum", "1"));
+        unsigned long ul = 0;
+        if (!cli_ulong(args.get("max_iters", "10"), "max_iters", ul)) return 1;
+        tcfg.max_iters = ul;
+        if (!cli_ulong(args.get("batch_size", "32"), "batch_size", ul)) return 1;
+        tcfg.batch_size = ul;
+        if (!cli_ulong(args.get("eval_every", "500"), "eval_every", ul)) return 1;
+        tcfg.eval_interval = ul;
+        if (!cli_ulong(args.get("grad_accum", "1"), "grad_accum", ul)) return 1;
+        tcfg.grad_accum_steps = ul;
         if (args.has("allow-untrained-params")) tcfg.allow_untrained_params = true;
         llm::Trainer trainer(model, tcfg, optim, sched);
         // D39: optional eval split during training
@@ -131,8 +178,10 @@ int main(int argc, char* argv[]) {
         } else
             trainer.train(ds);
         if (do_quant) {
-            int bits = std::stoi(args.get("bits", "8"));
-            size_t group = std::stoul(args.get("group", "128"));
+            int bits = 8;
+            if (!cli_int(args.get("bits", "8"), "bits", bits)) return 1;
+            if (!cli_ulong(args.get("group", "128"), "group", ul)) return 1;
+            size_t group = ul;
             if (bits != 4 && bits != 8) {
                 std::cerr << "[train] --bits must be 4 or 8\n";
                 return 1;
@@ -152,11 +201,19 @@ int main(int argc, char* argv[]) {
     } else if (cmd == "generate") {
         auto args = llm::parse_args(argc, argv);
         std::string prompt = args.get("prompt", "Hello");
-        float temp = std::stof(args.get("temperature", "1.0"));
-        int top_k = std::stoi(args.get("top_k", "0"));
-        float top_p = std::stof(args.get("top_p", "1.0"));
-        float rep = std::stof(args.get("repetition_penalty", "1.0"));
-        size_t max_tokens = std::stoi(args.get("max_tokens", "50"));
+        float temp = 1.0f, top_p = 1.0f, rep = 1.0f;
+        int top_k = 0, max_tokens_i = 50;
+        if (!cli_float(args.get("temperature", "1.0"), "temperature", temp)) return 1;
+        if (!cli_int(args.get("top_k", "0"), "top_k", top_k)) return 1;
+        if (!cli_float(args.get("top_p", "1.0"), "top_p", top_p)) return 1;
+        if (!cli_float(args.get("repetition_penalty", "1.0"), "repetition_penalty", rep)) return 1;
+        if (!cli_int(args.get("max_tokens", "50"), "max_tokens", max_tokens_i)) return 1;
+        if (max_tokens_i < 0) {
+            std::cerr << "error: --max_tokens expects a non-negative integer\n";
+            return 1;
+        }
+        size_t max_tokens = (size_t)max_tokens_i;
+        unsigned long ul = 0;
         std::string ckpt = args.get("checkpoint", "");
         std::string cfg_path = args.get("config", "");
         llm::Config cfg;
@@ -184,8 +241,10 @@ int main(int argc, char* argv[]) {
             model.load(ckpt);
         }
         if (args.has("quantize")) {
-            int bits = std::stoi(args.get("bits", "8"));
-            size_t group = std::stoul(args.get("group", "128"));
+            int bits = 8;
+            if (!cli_int(args.get("bits", "8"), "bits", bits)) return 1;
+            if (!cli_ulong(args.get("group", "128"), "group", ul)) return 1;
+            size_t group = ul;
             if (bits != 4 && bits != 8) {
                 std::cerr << "[generate] --bits must be 4 or 8\n";
                 return 1;
@@ -200,7 +259,10 @@ int main(int argc, char* argv[]) {
         llm::Tokenizer tok(256);
         auto ids = tok.encode(prompt);
         // G66: --seed for reproducible sampling
-        if (args.has("seed")) llm::set_global_seed((uint64_t)std::stoul(args.get("seed", "42")));
+        if (args.has("seed")) {
+            if (!cli_ulong(args.get("seed", "42"), "seed", ul)) return 1;
+            llm::set_global_seed((uint64_t)ul);
+        }
         // G66: --stop comma-separated strings -> truncate text at first occurrence
         std::vector<std::string> stops;
         if (args.has("stop")) {
@@ -274,7 +336,13 @@ int main(int argc, char* argv[]) {
     } else if (cmd == "serve") {
         // G61/G70: OpenAI-compatible server with graceful shutdown
         auto args = llm::parse_args(argc, argv);
-        int port = std::stoi(args.get("port", "8080"));
+        int port = 8080;
+        if (!cli_int(args.get("port", "8080"), "port", port)) return 1;
+        if (port <= 0 || port > 65535) {
+            std::cerr << "error: --port expects 1..65535, got '" << args.get("port", "8080")
+                      << "'\n";
+            return 1;
+        }
         std::string cfg_path = args.get("config", "");
         std::string ckpt = args.get("checkpoint", "");
         llm::Config cfg;
@@ -297,7 +365,9 @@ int main(int argc, char* argv[]) {
         llm::Tokenizer tok(256);
         llm::ServerConfig scfg;
         scfg.port = port;
-        scfg.max_concurrency = std::stoul(args.get("max_concurrency", "8"));
+        unsigned long ul = 0;
+        if (!cli_ulong(args.get("max_concurrency", "8"), "max_concurrency", ul)) return 1;
+        scfg.max_concurrency = ul;
         llm::Server srv(model, tok, scfg);
         if (!srv.start()) {
             std::cerr << "[serve] bind failed on port " << port << "\n";
@@ -306,17 +376,11 @@ int main(int argc, char* argv[]) {
         std::cout << "[serve] listening on 127.0.0.1:" << srv.port()
                   << " (max_concurrency=" << scfg.max_concurrency << ")\n";
         static std::atomic<bool> g_run{true};
-        static llm::Server* g_srv = nullptr;
-        g_srv = &srv;
-        std::signal(SIGTERM, [](int) {
-            g_run = false;
-            if (g_srv) g_srv->stop();
-        });
-        std::signal(SIGINT, [](int) {
-            g_run = false;
-            if (g_srv) g_srv->stop();
-        });
-        // G70: block until signal; handler drains in-flight via stop()
+        // Signal-safe: handler only flips the flag; the main thread below
+        // performs stop()/join (Server::stop is not async-signal-safe).
+        std::signal(SIGTERM, [](int) { g_run = false; });
+        std::signal(SIGINT, [](int) { g_run = false; });
+        // G70: block until signal; loop exit drains in-flight via stop()
         while (g_run.load()) std::this_thread::sleep_for(std::chrono::milliseconds(200));
         srv.stop();
         std::cout << "[serve] drained, bye\n";

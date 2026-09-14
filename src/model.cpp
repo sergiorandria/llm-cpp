@@ -93,6 +93,29 @@ static Tensor rope(const Tensor& x, size_t seq_len) {
     }
     return out;
 }
+
+// O(1) single-token RoPE application (NTK/YaRN) — no allocation
+static void apply_rope_incremental(Tensor& x, size_t pos, const Config& cfg) {
+    assert(x.shape[0] == 1);
+    size_t n_embd = x.shape[1];
+    float scaling = cfg.rope_scaling < 1.0f ? 1.0f : cfg.rope_scaling;
+    float base = cfg.rope_theta * (cfg.rope_mode == 0 ? scaling : 1.0f);
+    float attn_scale = 1.0f;
+    if (cfg.rope_mode == 1 && scaling > 1.0f)
+        attn_scale = std::sqrt(1.0f + 0.1f * std::log(scaling));
+    for (size_t i = 0; i + 1 < n_embd; i += 2) {
+        float freq = std::pow(base, -(float)i / n_embd);
+        if (cfg.rope_mode == 1 && scaling > 1.0f) {
+            float m = yarn_ramp(i, n_embd, cfg.yarn_beta);
+            freq = ((1.0f - m) / scaling + m) * std::pow(cfg.rope_theta, -(float)i / n_embd);
+        }
+        float angle = (float)pos * freq * cfg.yarn_alpha;
+        float cos_a = std::cos(angle), sin_a = std::sin(angle);
+        float x0 = x(0, i), x1 = x(0, i + 1);
+        x(0, i) = (x0 * cos_a - x1 * sin_a) * attn_scale;
+        x(0, i + 1) = (x0 * sin_a + x1 * cos_a) * attn_scale;
+    }
+}
 Tensor GPT::forward(const std::vector<int>& tokens) const {
     return forward_with_hidden(tokens).first;
 }
@@ -216,16 +239,9 @@ std::vector<int> GPT::generate(const std::vector<int>& prompt, size_t max_new_to
         size_t wpe_pos = pos % config_.block_size;  // wrap for sliding window
         for (size_t j = 0; j < config_.n_embd; ++j)
             x(0, j) = wte_(tok_clamped, j) + wpe_(wpe_pos, j);
-        // RoPE rotation for this pos (NTK/YaRN via rope_cfg on 1×C)
+        // RoPE rotation for this pos (NTK/YaRN) — O(1) single-token application
         if (config_.pos_encoding == PosEncoding::RoPE) {
-            Tensor one({1, config_.n_embd}, 0.0f);
-            for (size_t j = 0; j < config_.n_embd; ++j) one(0, j) = x(0, j);
-            // rope_cfg expects [T,C] with T=1 at position pos: shift by building
-            // a (pos+1)×C zero-padded tensor, rotating, then taking last row.
-            Tensor ext({pos + 1, config_.n_embd}, 0.0f);
-            for (size_t j = 0; j < config_.n_embd; ++j) ext(pos, j) = x(0, j);
-            Tensor rot = rope_cfg(ext, pos + 1, config_);
-            for (size_t j = 0; j < config_.n_embd; ++j) x(0, j) = rot(pos, j);
+            apply_rope_incremental(x, pos, config_);
         }
         Tensor h = x;
         for (size_t b = 0; b < blocks_.size(); ++b) {
@@ -313,7 +329,7 @@ std::vector<std::vector<int>> GPT::generate_batch(const std::vector<std::vector<
 
 // E45: greedy/sampled generate recording logprob of each chosen token.
 GPT::GenOutput GPT::generate_with_logprobs(const std::vector<int>& prompt, size_t max_new_tokens,
-                                           float temperature, int top_k, float top_p) const {
+                                            float temperature, int top_k, float top_p) const {
     GenOutput go;
     go.tokens = prompt;
     std::mt19937 rng(42);
@@ -326,10 +342,7 @@ GPT::GenOutput GPT::generate_with_logprobs(const std::vector<int>& prompt, size_
         size_t wp = pos % config_.block_size;
         for (size_t j = 0; j < config_.n_embd; ++j) x(0, j) = wte_(tc, j) + wpe_(wp, j);
         if (config_.pos_encoding == PosEncoding::RoPE) {
-            Tensor ext({pos + 1, config_.n_embd}, 0.0f);
-            for (size_t j = 0; j < config_.n_embd; ++j) ext(pos, j) = x(0, j);
-            Tensor rot = rope_cfg(ext, pos + 1, config_);
-            for (size_t j = 0; j < config_.n_embd; ++j) x(0, j) = rot(pos, j);
+            apply_rope_incremental(x, pos, config_);
         }
         Tensor h = x;
         for (size_t b = 0; b < blocks_.size(); ++b)
@@ -546,7 +559,7 @@ void GPT::load_binary(const std::string& path) {
 }
 
 std::vector<int> GPT::generate_streaming(const std::vector<int>& prompt, size_t max_new_tokens,
-                                         std::function<void(int)> cb) const {
+                                          std::function<void(int)> cb) const {
     // E43: true per-token streaming — cb fires as each token is sampled (not at end).
     // Uses generate_with_logprobs-equivalent incremental loop but invokes cb inline.
     std::vector<int> out = prompt;
@@ -560,10 +573,7 @@ std::vector<int> GPT::generate_streaming(const std::vector<int>& prompt, size_t 
         size_t wp = pos % config_.block_size;
         for (size_t j = 0; j < config_.n_embd; ++j) x(0, j) = wte_(tc, j) + wpe_(wp, j);
         if (config_.pos_encoding == PosEncoding::RoPE) {
-            Tensor ext({pos + 1, config_.n_embd}, 0.0f);
-            for (size_t j = 0; j < config_.n_embd; ++j) ext(pos, j) = x(0, j);
-            Tensor rot = rope_cfg(ext, pos + 1, config_);
-            for (size_t j = 0; j < config_.n_embd; ++j) x(0, j) = rot(pos, j);
+            apply_rope_incremental(x, pos, config_);
         }
         Tensor h = x;
         for (size_t b = 0; b < blocks_.size(); ++b)
