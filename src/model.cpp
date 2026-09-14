@@ -38,11 +38,24 @@ GPT::GPT(const Config& config)
                 wpe_(pos, i) = (i % 2 == 0) ? std::sin(angle) : std::cos(angle);
             }
     }
-    blocks_.reserve(config.n_layers);
-    for (size_t i = 0; i < config.n_layers; ++i) {
-        TransformerConfig bcfg;
-        bcfg.use_rmsnorm = config.use_rmsnorm;  // C22
-        blocks_.emplace_back(config.n_embd, config.n_heads, config.block_size, bcfg);
+    if (config_.use_mamba) {
+        // M4: MAMBA-2 blocks
+        size_t di = config_.d_inner ? config_.d_inner : 2 * config_.n_embd;
+        size_t ds = config_.d_state;
+        size_t dr = config_.dt_rank ? config_.dt_rank : (config_.n_embd + 15) / 16;
+        size_t ck = config_.conv_kernel;
+        mamba_blocks_.reserve(config_.n_layers);
+        for (size_t i = 0; i < config_.n_layers; ++i) {
+            mamba_blocks_.emplace_back(config_.n_embd, di, ds, dr, ck, config_.use_rmsnorm);
+        }
+        mamba_state_ = std::make_unique<MambaState>(config_.n_layers, di, ds);
+    } else {
+        blocks_.reserve(config.n_layers);
+        for (size_t i = 0; i < config.n_layers; ++i) {
+            TransformerConfig bcfg;
+            bcfg.use_rmsnorm = config.use_rmsnorm;  // C22
+            blocks_.emplace_back(config.n_embd, config.n_heads, config.block_size, bcfg);
+        }
     }
 }
 
@@ -134,8 +147,14 @@ std::pair<Tensor, Tensor> GPT::forward_with_hidden(const std::vector<int>& token
         }
     }
     if (config_.pos_encoding == PosEncoding::RoPE) x = rope_cfg(x, T, config_);
-    for (auto& block : blocks_) {
-        x = block.forward(x);
+    if (config_.use_mamba) {
+        for (auto& block : mamba_blocks_) {
+            x = block.forward(x);
+        }
+    } else {
+        for (auto& block : blocks_) {
+            x = block.forward(x);
+        }
     }
     x = config_.use_rmsnorm ? x.rmsnorm(&ln_f_gamma_) : x.layernorm(&ln_f_gamma_, &ln_f_beta_);
     Tensor logits = x.matmul(lm_head_);  // [T, vocab]
@@ -146,6 +165,8 @@ void GPT::zero_grad() {
 }
 void GPT::backward(const Tensor& dlogits, const std::vector<int>& tokens, const Tensor& hidden) {
     size_t T = dlogits.shape[0];
+    // M4: backward not implemented for MAMBA path yet
+    if (config_.use_mamba) return;
     // grad for lm_head: hidden^T * dlogits
     Tensor dW_lm({hidden.shape[1], dlogits.shape[1]}, 0.0f);
     for (size_t i = 0; i < hidden.shape[1]; ++i)
@@ -227,6 +248,65 @@ std::vector<int> GPT::generate(const std::vector<int>& prompt, size_t max_new_to
                                float temperature, int top_k, float top_p, float rep_penalty) const {
     std::vector<int> out = prompt;
     std::mt19937 rng(42);
+
+    // M4: MAMBA path — no KV cache, re-embed and run full sequence each step
+    if (config_.use_mamba) {
+        auto mamba_logits_for_seq = [&](const std::vector<int>& tokens) -> std::vector<float> {
+            size_t T = tokens.size();
+            Tensor x({T, config_.n_embd}, 0.0f);
+            for (size_t t = 0; t < T; ++t) {
+                int tc = ((tokens[t] % (int)config_.vocab_size) + (int)config_.vocab_size) %
+                         (int)config_.vocab_size;
+                size_t wp = t % config_.block_size;
+                for (size_t j = 0; j < config_.n_embd; ++j)
+                    x(t, j) = wte_(tc, j) + wpe_(wp, j);
+            }
+            if (config_.pos_encoding == PosEncoding::RoPE) x = rope_cfg(x, T, config_);
+            for (auto& block : mamba_blocks_) {
+                x = block.forward(x);
+            }
+            x = config_.use_rmsnorm ? x.rmsnorm(&ln_f_gamma_) : x.layernorm(&ln_f_gamma_, &ln_f_beta_);
+            Tensor logits = x.matmul(lm_head_);
+            std::vector<float> row(config_.vocab_size);
+            for (size_t j = 0; j < config_.vocab_size; ++j) row[j] = logits(T - 1, j);
+            return row;
+        };
+        // Prefill
+        std::vector<float> last_logits;
+        if (!out.empty()) {
+            last_logits = mamba_logits_for_seq(out);
+        } else {
+            last_logits.assign(config_.vocab_size, 0.0f);
+        }
+        for (size_t step = 0; step < max_new_tokens; ++step) {
+            std::vector<float> cur_logits = last_logits;
+            if (rep_penalty != 1.0f)
+                cur_logits = apply_repetition_penalty(cur_logits, out, rep_penalty);
+            int next_id = 0;
+            if (temperature == 0.0f) {
+                int best = 0;
+                float bestv = cur_logits[0];
+                for (size_t i = 1; i < cur_logits.size(); ++i)
+                    if (cur_logits[i] > bestv) { bestv = cur_logits[i]; best = (int)i; }
+                next_id = best;
+            } else {
+                if (temperature != 1.0f)
+                    for (auto& v : cur_logits) v /= temperature;
+                float maxv = *std::max_element(cur_logits.begin(), cur_logits.end());
+                float sum = 0;
+                for (auto& v : cur_logits) { v = std::exp(v - maxv); sum += v; }
+                for (auto& v : cur_logits) v /= sum;
+                std::discrete_distribution<int> dist(cur_logits.begin(), cur_logits.end());
+                next_id = dist(rng);
+            }
+            out.push_back(next_id);
+            if (step + 1 >= max_new_tokens) break;
+            last_logits = mamba_logits_for_seq(out);
+        }
+        return out;
+    }
+
+    // Transformer path (original)
     // Per-layer KV-cache: O(n) generation, each layer stores K/V for all previous tokens
     KVCache cache(config_.n_layers, config_.block_size, config_.n_embd);
     cache.clear();
@@ -613,11 +693,18 @@ void GPT::load(const std::string& path) {
 size_t GPT::num_parameters() const {
     size_t n =
         wte_.numel() + wpe_.numel() + ln_f_gamma_.numel() + ln_f_beta_.numel() + lm_head_.numel();
-    for (auto& b : blocks_) {
-        n += 4 * config_.n_embd * config_.n_embd;
-        n += 4 * config_.n_embd;
-        n += config_.n_embd * 4 * config_.n_embd + 4 * config_.n_embd * config_.n_embd;
-        n += 5 * config_.n_embd;
+    if (config_.use_mamba) {
+        for (auto& b : mamba_blocks_) {
+            auto bp = b.parameters();
+            for (auto* p : bp) n += p->numel();
+        }
+    } else {
+        for (auto& b : blocks_) {
+            n += 4 * config_.n_embd * config_.n_embd;
+            n += 4 * config_.n_embd;
+            n += config_.n_embd * 4 * config_.n_embd + 4 * config_.n_embd * config_.n_embd;
+            n += 5 * config_.n_embd;
+        }
     }
     if (config_.weight_tying) n -= lm_head_.numel();  // tied, not double-counted
     return n;
@@ -625,29 +712,43 @@ size_t GPT::num_parameters() const {
 
 std::vector<Tensor*> GPT::parameters() {
     std::vector<Tensor*> p;
-    p.reserve(4 + blocks_.size() * 14);
+    p.reserve(4 + blocks_.size() * 14 + mamba_blocks_.size() * 9);
     p.push_back(&wte_);
     p.push_back(&wpe_);
     p.push_back(&ln_f_gamma_);
     p.push_back(&ln_f_beta_);
     if (!config_.weight_tying) p.push_back(&lm_head_);
-    for (auto& blk : blocks_) {
-        auto bp = blk.parameters();
-        p.insert(p.end(), bp.begin(), bp.end());
+    if (config_.use_mamba) {
+        for (auto& blk : mamba_blocks_) {
+            auto bp = blk.parameters();
+            p.insert(p.end(), bp.begin(), bp.end());
+        }
+    } else {
+        for (auto& blk : blocks_) {
+            auto bp = blk.parameters();
+            p.insert(p.end(), bp.begin(), bp.end());
+        }
     }
     return p;
 }
 std::vector<const Tensor*> GPT::parameters() const {
     std::vector<const Tensor*> p;
-    p.reserve(4 + blocks_.size() * 14);
+    p.reserve(4 + blocks_.size() * 14 + mamba_blocks_.size() * 9);
     p.push_back(&wte_);
     p.push_back(&wpe_);
     p.push_back(&ln_f_gamma_);
     p.push_back(&ln_f_beta_);
     if (!config_.weight_tying) p.push_back(&lm_head_);
-    for (auto& blk : blocks_) {
-        auto bp = blk.parameters();
-        p.insert(p.end(), bp.begin(), bp.end());
+    if (config_.use_mamba) {
+        for (auto& blk : mamba_blocks_) {
+            auto bp = blk.parameters();
+            p.insert(p.end(), bp.begin(), bp.end());
+        }
+    } else {
+        for (auto& blk : blocks_) {
+            auto bp = blk.parameters();
+            p.insert(p.end(), bp.begin(), bp.end());
+        }
     }
     return p;
 }

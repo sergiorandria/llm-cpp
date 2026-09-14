@@ -1,8 +1,11 @@
 #pragma once
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "mamba.h"
+#include "mamba_state.h"
 #include "tokenizer.h"
 #include "transformer.h"
 
@@ -32,6 +35,12 @@ struct Config {
     bool use_alibi = false;       // C24: ALiBi bias (mutually exclusive with RoPE)
     size_t sliding_window = 0;    // C25: 0 = full attention, else local window
     size_t global_every = 1;      // C25: every Nth layer is global when sliding
+    // M4: MAMBA-2 config
+    bool use_mamba = false;        // true = MAMBA-2 blocks instead of Transformer
+    size_t d_inner = 0;           // 0 = auto: 2 * n_embd
+    size_t d_state = 16;          // SSM state dimension
+    size_t dt_rank = 0;           // 0 = auto: ceil(n_embd / 16)
+    size_t conv_kernel = 4;       // Conv1D kernel width
 };
 // C25: hybrid pattern — layer idx global iff (idx+1) % global_every == 0 (or sliding off)
 inline bool is_global_layer(size_t idx, size_t global_every, size_t sliding_window) {
@@ -102,6 +111,9 @@ class GPT {
     Tensor wte_;  // token embedding [vocab, n_embd]
     Tensor wpe_;  // position embedding [block_size, n_embd]
     std::vector<TransformerBlock> blocks_;
+    // M4: MAMBA-2 path (when use_mamba=true)
+    std::vector<MambaBlock> mamba_blocks_;
+    std::unique_ptr<MambaState> mamba_state_;
     Tensor ln_f_gamma_, ln_f_beta_;
     Tensor lm_head_;  // [n_embd, vocab]
 };
