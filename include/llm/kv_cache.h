@@ -8,10 +8,17 @@ struct KVCacheConfig {
     bool soa = false;
     bool paged = false;
     size_t page_size = 16;
+    bool use_cuda = false;  // GPU-resident K/V (cuBLAS matmul reads directly)
 };  // SoA [n_embd, max_seq_len] better for head slices
 class KVCache {
    public:
     KVCache(size_t n_layers, size_t max_seq_len, size_t n_embd, KVCacheConfig cfg = {});
+    ~KVCache();
+    KVCache(const KVCache&) = delete;
+    KVCache& operator=(const KVCache&) = delete;
+    KVCache(KVCache&& o) noexcept;
+    KVCache& operator=(KVCache&& o) noexcept;
+
     void update(size_t layer, const Tensor& k, const Tensor& v);
     Tensor get_k(size_t layer) const;
     Tensor get_v(size_t layer) const;
@@ -41,6 +48,9 @@ class KVCache {
     bool is_paged() const {
         return cfg_.paged;
     }
+    bool is_cuda() const {
+        return cfg_.use_cuda;
+    }
 
    private:
     size_t n_layers_, max_seq_len_, n_embd_;
@@ -51,5 +61,13 @@ class KVCache {
     void ensure_page(size_t layer, size_t page) const;
     TensorPool* pool_ = nullptr;
     size_t cur_len_ = 0;
+
+    // GPU-resident K/V storage (when cfg_.use_cuda == true)
+    // gk_[layer] and gv_[layer] are device pointers to [max_seq_len, n_embd] row-major float
+    std::vector<void*> gk_, gv_;
+    void cuda_alloc_layer(size_t layer);
+    void cuda_free_all();
+    void cuda_update(size_t layer, const Tensor& k, const Tensor& v);
+    void cuda_get_slice(size_t layer, Tensor& out_k, Tensor& out_v) const;
 };
 }  // namespace llm

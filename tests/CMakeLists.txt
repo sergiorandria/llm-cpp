@@ -172,6 +172,8 @@ add_executable(test_pool test_pool.cpp ../src/pool.cpp ../src/kv_cache.cpp ../sr
 add_test(NAME pool COMMAND test_pool)
 add_executable(test_backend test_backend.cpp ../src/backend.cpp ../src/tensor.cpp)
 add_test(NAME backend COMMAND test_backend)
+add_executable(test_kv_cache_cuda test_kv_cache_cuda.cpp ../src/kv_cache.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp ../src/config.cpp ../src/profiling.cpp ../src/pool.cpp)
+add_test(NAME kv_cache_cuda COMMAND test_kv_cache_cuda)
 add_executable(test_version test_version.cpp)
 add_test(NAME version COMMAND test_version)
 add_executable(test_overfit test_overfit.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/trainer.cpp ../src/dataset.cpp ../src/optimizer.cpp ../src/scheduler.cpp ../src/loss.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp ../src/profiling.cpp ../src/pool.cpp)
