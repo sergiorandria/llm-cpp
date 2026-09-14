@@ -187,3 +187,5 @@ add_test(NAME pybind COMMAND ${CMAKE_COMMAND} -E env "LD_LIBRARY_PATH=${CMAKE_BI
 set_tests_properties(pybind PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_executable(test_log_prof test_log_prof.cpp ../src/logging.cpp ../src/profiling.cpp ../src/model.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp ../src/pool.cpp)
 add_test(NAME log_prof COMMAND test_log_prof)
+add_executable(test_mamba_scan test_mamba_scan.cpp ../src/mamba_scan.cpp)
+add_test(NAME mamba_scan COMMAND test_mamba_scan)
