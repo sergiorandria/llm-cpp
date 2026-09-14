@@ -40,7 +40,8 @@ struct Config {
     size_t d_inner = 0;           // 0 = auto: 2 * n_embd
     size_t d_state = 16;          // SSM state dimension
     size_t dt_rank = 0;           // 0 = auto: ceil(n_embd / 16)
-    size_t conv_kernel = 4;       // Conv1D kernel width
+    size_t conv_kernel = 4;
+    bool use_gpu_weights = false;       // Conv1D kernel width
 };
 // C25: hybrid pattern — layer idx global iff (idx+1) % global_every == 0 (or sliding off)
 inline bool is_global_layer(size_t idx, size_t global_every, size_t sliding_window) {
