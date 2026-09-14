@@ -1,7 +1,6 @@
 // src/mamba_scan.cpp
 #include "llm/mamba_scan.h"
 #include <cmath>
-#include <cassert>
 
 namespace llm {
 

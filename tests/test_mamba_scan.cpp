@@ -1,6 +1,6 @@
 // tests/test_mamba_scan.cpp
-#include <cassert>
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
 #include <vector>
 #include "llm/mamba_scan.h"
@@ -17,14 +17,26 @@ int main() {
     std::vector<float> h0(D * N, 0.0f);    // initial state
     std::vector<float> y(T * D);
 
+    // Input size validation
+    if (x.size() != T * D) { std::cerr << "FAIL: x.size() != T * D\n"; return 1; }
+    if (A.size() != D * N) { std::cerr << "FAIL: A.size() != D * N\n"; return 1; }
+    if (B.size() != T * N) { std::cerr << "FAIL: B.size() != T * N\n"; return 1; }
+    if (C.size() != T * N) { std::cerr << "FAIL: C.size() != T * N\n"; return 1; }
+    if (dt.size() != T * D) { std::cerr << "FAIL: dt.size() != T * D\n"; return 1; }
+    if (D_skip.size() != D) { std::cerr << "FAIL: D_skip.size() != D\n"; return 1; }
+    if (h0.size() != D * N) { std::cerr << "FAIL: h0.size() != D * N\n"; return 1; }
+
     llm::selective_scan_sequential(x, A, B, C, dt, D_skip, h0, y, T, D, N);
 
     // With A=-0.5, dt=0.1: A_eff = exp(-0.5*0.1) ≈ 0.9512
     // h_0 = 0, x_0 = 1.0, B_0 = 0.1
-    // h_1 = 0.9512 * 0 + 0.1 * 1.0 * 0.1 = 0.01 (B*x*dt)
-    // y_0 = C_0 * h_1 + D * x_0 = 1.0 * 0.01 + 1.0 * 1.0 = 1.01
-    assert(y.size() == T * D);
-    assert(std::abs(y[0] - 1.01f) < 0.02f);  // rough check
+    // h_1 = A_eff * h_0 + B_0 * x_0 * dt = 0 + 0.1 * 1.0 * 0.1 = 0.01
+    // y_0 = sum_n(C_0[n] * h_1[n]) + D * x_0 = 4 * (1.0 * 0.01) + 1.0 * 1.0 = 1.04
+    if (y.size() != T * D) { std::cerr << "FAIL: y.size() != T * D\n"; return 1; }
+    if (std::abs(y[0] - 1.04f) > 0.005f) {
+        std::cerr << "FAIL: y[0] = " << y[0] << ", expected 1.04\n";
+        return 1;
+    }
 
     // Test that parallel scan matches sequential scan
     std::vector<float> y_parallel(T * D);
@@ -32,8 +44,8 @@ int main() {
 
     for (size_t i = 0; i < T * D; ++i) {
         if (std::abs(y[i] - y_parallel[i]) > 1e-4f) {
-            std::cerr << "MISMATCH at " << i << " seq=" << y[i] << " par=" << y_parallel[i] << "\n";
-            assert(false);
+            std::cerr << "FAIL: MISMATCH at " << i << " seq=" << y[i] << " par=" << y_parallel[i] << "\n";
+            return 1;
         }
     }
 
