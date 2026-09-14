@@ -1,5 +1,4 @@
 // tests/test_mamba_block.cpp
-#include <cassert>
 #include <cmath>
 #include <iostream>
 #include "llm/mamba.h"
@@ -11,11 +10,17 @@ int main() {
     // Forward pass: [T, n_embd] -> [T, n_embd]
     llm::Tensor x({4, n_embd}, 0.5f);
     llm::Tensor out = block.forward(x);
-    assert(out.shape[0] == 4 && out.shape[1] == n_embd);
+    if (out.shape[0] != 4 || out.shape[1] != n_embd) {
+        std::cerr << "FAIL: output shape mismatch\n";
+        return 1;
+    }
 
     // Check no NaN
     for (size_t i = 0; i < out.data.size(); ++i) {
-        assert(!std::isnan(out.data[i]));
+        if (std::isnan(out.data[i])) {
+            std::cerr << "FAIL: NaN at index " << i << "\n";
+            return 1;
+        }
     }
 
     // Check residual connection: out ≈ x + small_correction
@@ -24,11 +29,17 @@ int main() {
         max_diff = std::max(max_diff, std::abs(out.data[i] - x.data[i]));
     }
     std::cout << "max_diff from residual: " << max_diff << "\n";
-    assert(max_diff < 2.0f);
+    if (max_diff >= 2.0f) {
+        std::cerr << "FAIL: residual difference too large (" << max_diff << ")\n";
+        return 1;
+    }
 
     // Check parameter count
     auto params = block.parameters();
-    assert(params.size() > 5);
+    if (params.size() != 9) {
+        std::cerr << "FAIL: expected 9 parameter tensors, got " << params.size() << "\n";
+        return 1;
+    }
     std::cout << "parameter tensors: " << params.size() << "\n";
 
     std::cout << "test_mamba_block passed\n";

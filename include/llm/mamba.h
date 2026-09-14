@@ -35,9 +35,6 @@ private:
     Tensor d_weight_;                     // [d_inner]
     Tensor out_proj_weight_;              // [n_embd, d_inner]
 
-    // Conv1D state (for incremental inference)
-    mutable std::vector<float> conv_state_;  // [d_inner * (conv_kernel-1)]
-
     // Helper: depth-wise conv1d
     Tensor conv1d_forward(const Tensor& x) const;
 };

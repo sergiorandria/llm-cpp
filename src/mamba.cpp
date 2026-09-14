@@ -2,8 +2,8 @@
 #include "llm/mamba.h"
 #include "llm/mamba_scan.h"
 #include <cmath>
-#include <cassert>
 #include <algorithm>
+#include <stdexcept>
 
 namespace llm {
 
@@ -31,7 +31,6 @@ MambaBlock::MambaBlock(size_t n_embd, size_t d_inner, size_t d_state,
     x_proj_weight_.randn(0, 1.0f / std::sqrt((float)d_inner));
     dt_proj_weight_.randn(0, 0.001f);
     a_log_.fill(-1.0f);
-    conv_state_.assign(d_inner * (conv_kernel - 1), 0.0f);
 }
 
 Tensor MambaBlock::conv1d_forward(const Tensor& x) const {
@@ -59,7 +58,9 @@ Tensor MambaBlock::conv1d_forward(const Tensor& x) const {
 }
 
 Tensor MambaBlock::forward(const Tensor& x) const {
-    assert(x.shape[1] == n_embd_);
+    if (x.shape[1] != n_embd_) {
+        throw std::runtime_error("MambaBlock::forward: input feature dim mismatch");
+    }
     size_t T = x.shape[0];
 
     // 1. RMSNorm
@@ -67,7 +68,9 @@ Tensor MambaBlock::forward(const Tensor& x) const {
 
     // 2. Input projection: [T, 2*d_inner]
     Tensor proj = normed.matmul(in_proj_weight_.transpose());
-    assert(proj.shape[0] == T && proj.shape[1] == 2 * d_inner_);
+    if (proj.shape[0] != T || proj.shape[1] != 2 * d_inner_) {
+        throw std::runtime_error("MambaBlock::forward: projection shape mismatch");
+    }
 
     // Split into gate (x_z) and SSM branch (x_ssm)
     Tensor x_z({T, d_inner_}, 0.0f);
