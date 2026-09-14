@@ -189,3 +189,5 @@ add_executable(test_log_prof test_log_prof.cpp ../src/logging.cpp ../src/profili
 add_test(NAME log_prof COMMAND test_log_prof)
 add_executable(test_mamba_scan test_mamba_scan.cpp ../src/mamba_scan.cpp)
 add_test(NAME mamba_scan COMMAND test_mamba_scan)
+add_executable(test_mamba_block test_mamba_block.cpp ../src/mamba.cpp ../src/mamba_scan.cpp ../src/tensor.cpp)
+add_test(NAME mamba_block COMMAND test_mamba_block)
