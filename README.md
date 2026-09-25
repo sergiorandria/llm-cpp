@@ -36,6 +36,10 @@ Implementation of a Large Language Model (LLM) from scratch in C++.
 - [x] Beam search (`beam_search` tracks cumulative logprob, expands top-k per beam, keeps best — `test_beam_search` asserts score ≥ greedy)
 - [x] Fused ops (`fused_layernorm_residual` single-pass fused + `fused_gelu`/`fused_matmul_gelu` single-pass OpenMP/SIMD, not alias)
 - [x] Prefetch (`PrefetchLoader` background thread producer/consumer queue, `prefetch` batches ahead, `has_next`/`next` thread-safe)
+- [x] Mamba-2 blocks (`MambaBlock` RMSNorm + causal depthwise conv + SiLU + selective scan + gate + residual, `Config{use_mamba,d_inner,d_state,dt_rank,conv_kernel}`) — full BPTT manual backward (`MambaBlock::backward`, `GPT::backward` mamba path, `test_mamba_backward` finite-diff + overfit)
+- [x] Selective scan parallel (`selective_scan_parallel` chunked associative prefix over (A,B) pairs, OpenMP over channels; `T={33,129}` parity in `test_mamba_scan`) + CUDA kernel (`mamba_scan_cuda.cu`, exact mirror, CPU fallback)
+- [x] GPU weights (`GPUWeights` upload/download with shape-preserving roundtrip, CUDA device buffers when `USE_CUDA=ON` else CPU mirror, `GPT::gpu_weights_count`, `test_gpu_weights` + `test_gpu_integration`)
+- [x] Mamba serialization (binary v4 + GGUF + SafeTensors roundtrips in `test_mamba_model`)
 
 ## Quick Start
 
