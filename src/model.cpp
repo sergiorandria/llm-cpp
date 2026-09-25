@@ -581,7 +581,7 @@ void GPT::save_binary(const std::string& path) const {
     }
     uint32_t magic = 0x4C4C4D00;
     out.write((char*)&magic, 4);
-    uint32_t version = 3;
+    uint32_t version = config_.use_mamba ? 4 : 3;
     out.write((char*)&version, 4);
     out.write((char*)&config_.vocab_size, sizeof(size_t));
     out.write((char*)&config_.n_layers, sizeof(size_t));
@@ -604,13 +604,33 @@ void GPT::save_binary(const std::string& path) const {
     write_tensor(ln_f_gamma_);
     write_tensor(ln_f_beta_);
     write_tensor(lm_head_);
-    uint64_t n_blocks = blocks_.size();
-    out.write((char*)&n_blocks, 8);
-    for (auto& blk : blocks_) {
-        auto ps = blk.parameters();
-        uint64_t n_p = ps.size();
-        out.write((char*)&n_p, 8);
-        for (auto* p : ps) write_tensor(*p);
+    if (config_.use_mamba) {
+        // v4: write mamba config + mamba blocks
+        size_t di = config_.d_inner ? config_.d_inner : 2 * config_.n_embd;
+        size_t ds = config_.d_state;
+        size_t dr = config_.dt_rank ? config_.dt_rank : (config_.n_embd + 15) / 16;
+        size_t ck = config_.conv_kernel;
+        out.write((char*)&di, sizeof(size_t));
+        out.write((char*)&ds, sizeof(size_t));
+        out.write((char*)&dr, sizeof(size_t));
+        out.write((char*)&ck, sizeof(size_t));
+        uint64_t n_blocks = mamba_blocks_.size();
+        out.write((char*)&n_blocks, 8);
+        for (auto& blk : mamba_blocks_) {
+            auto ps = blk.parameters();
+            uint64_t n_p = ps.size();
+            out.write((char*)&n_p, 8);
+            for (auto* p : ps) write_tensor(*p);
+        }
+    } else {
+        uint64_t n_blocks = blocks_.size();
+        out.write((char*)&n_blocks, 8);
+        for (auto& blk : blocks_) {
+            auto ps = blk.parameters();
+            uint64_t n_p = ps.size();
+            out.write((char*)&n_p, 8);
+            for (auto* p : ps) write_tensor(*p);
+        }
     }
 }
 void GPT::load_binary(const std::string& path) {
@@ -661,7 +681,73 @@ void GPT::load_binary(const std::string& path) {
     read_tensor(ln_f_gamma_);
     read_tensor(ln_f_beta_);
     read_tensor(lm_head_);
-    if (version >= 3) {
+    if (version >= 4 && config_.use_mamba) {
+        // v4: mamba config + mamba blocks
+        size_t di, ds, dr, ck;
+        in.read((char*)&di, sizeof(size_t));
+        in.read((char*)&ds, sizeof(size_t));
+        in.read((char*)&dr, sizeof(size_t));
+        in.read((char*)&ck, sizeof(size_t));
+        // Recreate mamba blocks if they don't match
+        if (mamba_blocks_.empty() ||
+            mamba_blocks_[0].n_embd() != ne || mamba_blocks_[0].d_inner() != di ||
+            mamba_blocks_[0].d_state() != ds) {
+            mamba_blocks_.clear();
+            mamba_blocks_.reserve(nl);
+            for (size_t i = 0; i < nl; ++i)
+                mamba_blocks_.emplace_back(ne, di, ds, dr, ck, config_.use_rmsnorm);
+            if (!mamba_state_) mamba_state_ = std::make_unique<MambaState>(nl, di, ds);
+        }
+        uint64_t n_blocks;
+        in.read((char*)&n_blocks, 8);
+        if (n_blocks != mamba_blocks_.size()) {
+            std::cerr << "[load_binary] mamba block count mismatch " << n_blocks << " vs "
+                      << mamba_blocks_.size() << " — skipping block weights\n";
+            for (uint64_t b = 0; b < n_blocks; ++b) {
+                uint64_t n_p;
+                in.read((char*)&n_p, 8);
+                for (uint64_t p = 0; p < n_p; ++p) {
+                    uint64_t ndim;
+                    in.read((char*)&ndim, 8);
+                    std::vector<size_t> shape(ndim);
+                    for (uint64_t i = 0; i < ndim; ++i) {
+                        uint64_t v;
+                        in.read((char*)&v, 8);
+                        shape[i] = v;
+                    }
+                    uint64_t n;
+                    in.read((char*)&n, 8);
+                    std::vector<float> tmp(n);
+                    in.read((char*)tmp.data(), n * sizeof(float));
+                }
+            }
+        } else {
+            for (auto& blk : mamba_blocks_) {
+                uint64_t n_p;
+                in.read((char*)&n_p, 8);
+                auto ps = blk.parameters();
+                if (n_p != ps.size()) {
+                    std::cerr << "[load_binary] mamba param count mismatch\n";
+                    for (uint64_t p = 0; p < n_p; ++p) {
+                        uint64_t ndim;
+                        in.read((char*)&ndim, 8);
+                        std::vector<size_t> shape(ndim);
+                        for (uint64_t i = 0; i < ndim; ++i) {
+                            uint64_t v;
+                            in.read((char*)&v, 8);
+                            shape[i] = v;
+                        }
+                        uint64_t n;
+                        in.read((char*)&n, 8);
+                        std::vector<float> tmp(n);
+                        in.read((char*)tmp.data(), n * sizeof(float));
+                    }
+                    continue;
+                }
+                for (auto* p : ps) read_tensor(*p);
+            }
+        }
+    } else if (version >= 3) {
         uint64_t n_blocks;
         in.read((char*)&n_blocks, 8);
         if (n_blocks != blocks_.size()) {
