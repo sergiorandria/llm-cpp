@@ -10,6 +10,7 @@
 #include <iostream>
 #include <random>
 
+#include "llm/gpu_weights.h"
 #include "llm/kv_cache.h"
 #include "llm/profiling.h"
 #include "llm/sampling.h"
@@ -56,6 +57,14 @@ GPT::GPT(const Config& config)
             bcfg.use_rmsnorm = config.use_rmsnorm;  // C22
             blocks_.emplace_back(config.n_embd, config.n_heads, config.block_size, bcfg);
         }
+    }
+    if (config_.use_gpu_weights) {
+        auto params = parameters();
+        std::vector<Tensor> param_copies;
+        param_copies.reserve(params.size());
+        for (auto* p : params) param_copies.push_back(*p);
+        gpu_weights_.upload(param_copies);
+        gpu_weights_uploaded_ = true;
     }
 }
 
@@ -636,6 +645,14 @@ void GPT::load_binary(const std::string& path) {
         }
     }
     if (config_.weight_tying) tie_weights();
+    if (config_.use_gpu_weights) {
+        auto params = parameters();
+        std::vector<Tensor> param_copies;
+        param_copies.reserve(params.size());
+        for (auto* p : params) param_copies.push_back(*p);
+        gpu_weights_.upload(param_copies);
+        gpu_weights_uploaded_ = true;
+    }
 }
 
 std::vector<int> GPT::generate_streaming(const std::vector<int>& prompt, size_t max_new_tokens,
@@ -688,6 +705,10 @@ std::vector<int> GPT::generate_streaming(const std::vector<int>& prompt, size_t 
 void GPT::load(const std::string& path) {
     load_binary(path);
     std::cout << "[load] checkpoint loaded from " << path << "\n";
+}
+
+size_t GPT::gpu_weights_count() const {
+    return gpu_weights_uploaded_ ? gpu_weights_.count() : 0;
 }
 
 size_t GPT::num_parameters() const {

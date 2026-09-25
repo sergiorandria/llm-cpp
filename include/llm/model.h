@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "gpu_weights.h"
 #include "mamba.h"
 #include "mamba_state.h"
 #include "tokenizer.h"
@@ -104,6 +105,8 @@ class GPT {
     const Config& config() const {
         return config_;
     }
+    // M7: number of params uploaded to GPUWeights (0 when use_gpu_weights=false)
+    size_t gpu_weights_count() const;
     // C30: extend context by interpolating wpe_ to new_block_size (>= current)
     void extend_context(size_t new_block_size);
 
@@ -117,6 +120,8 @@ class GPT {
     std::unique_ptr<MambaState> mamba_state_;
     Tensor ln_f_gamma_, ln_f_beta_;
     Tensor lm_head_;  // [n_embd, vocab]
+    GPUWeights gpu_weights_;
+    bool gpu_weights_uploaded_ = false;
 };
 
 }  // namespace llm

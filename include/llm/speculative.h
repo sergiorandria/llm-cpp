@@ -9,8 +9,11 @@ public:
     // Greedy (temp=0) speculative: draft proposes k tokens, target verifies via single forward over out+draft
     // Returns prompt + max_tokens new tokens, token-for-token identical to target.generate(prompt, max_tokens, 0,0) when temp=0
     std::vector<int> generate(const std::vector<int>& prompt, size_t max_tokens) const;
-private:
-    const GPT& draft_, target_;
+ private:
+    const GPT& draft_;
+    const GPT& target_;  // NOTE: was `const GPT& draft_, target_;` — the trailing
+                         // declarator binds by value, requiring a GPT copy ctor
+                         // (broke the build once GPT became non-copyable in M4).
     size_t k_;
 };
 }

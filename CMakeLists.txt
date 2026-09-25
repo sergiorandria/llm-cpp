@@ -128,9 +128,9 @@ install(DIRECTORY include/ DESTINATION include)
 
 # G63: shared C ABI library for Python ctypes (no pybind11 needed)
 add_library(llm-c-api SHARED
-  src/c_api.cpp src/model.cpp src/attention.cpp src/tensor.cpp src/transformer.cpp
+  src/c_api.cpp src/model.cpp src/mamba.cpp src/mamba_scan.cpp src/mamba_state.cpp src/attention.cpp src/tensor.cpp src/transformer.cpp
   src/tokenizer.cpp src/sampling.cpp src/kv_cache.cpp src/flash_attention.cpp
-  src/fused.cpp src/layernorm.cpp src/utils.cpp src/config.cpp src/profiling.cpp src/pool.cpp)
+  src/fused.cpp src/layernorm.cpp src/gpu_weights.cpp src/utils.cpp src/config.cpp src/profiling.cpp src/pool.cpp)
 target_include_directories(llm-c-api PRIVATE include)
 set_target_properties(llm-c-api PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 if(USE_NUMPY_CPP AND TARGET numpy-cpp)
@@ -158,9 +158,9 @@ if(USE_NUMPY_CPP AND TARGET numpy-cpp)
 endif()
 
 # I89: inference benchmark (tokens/sec, p50/p95)
-add_executable(bench_infer scripts/bench_infer.cpp src/model.cpp src/attention.cpp src/tensor.cpp
+add_executable(bench_infer scripts/bench_infer.cpp src/model.cpp src/mamba.cpp src/mamba_scan.cpp src/mamba_state.cpp src/attention.cpp src/tensor.cpp
   src/transformer.cpp src/tokenizer.cpp src/sampling.cpp src/kv_cache.cpp src/flash_attention.cpp
-  src/fused.cpp src/layernorm.cpp src/utils.cpp src/config.cpp src/profiling.cpp src/pool.cpp)
+  src/fused.cpp src/layernorm.cpp src/gpu_weights.cpp src/utils.cpp src/config.cpp src/profiling.cpp src/pool.cpp)
 target_include_directories(bench_infer PRIVATE include)
 if(USE_NUMPY_CPP AND TARGET numpy-cpp)
   target_link_libraries(bench_infer PRIVATE numpy-cpp)
