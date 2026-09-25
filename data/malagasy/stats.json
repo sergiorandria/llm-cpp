@@ -1,0 +1,59 @@
+{
+  "tononkira": {
+    "count": 487,
+    "chars": 530817,
+    "file": "/home/sergio/Project/llm-cpp/data/malagasy/processed/tononkira.txt"
+  },
+  "vetso": {
+    "count": 486,
+    "chars": 334964,
+    "file": "/home/sergio/Project/llm-cpp/data/malagasy/processed/vetso.txt"
+  },
+  "ohabolana": {
+    "count": 600,
+    "chars": 34201,
+    "file": "/home/sergio/Project/llm-cpp/data/malagasy/processed/ohabolana.txt"
+  },
+  "takila": {
+    "count": 176,
+    "chars": 1462358,
+    "file": "/home/sergio/Project/llm-cpp/data/malagasy/processed/takila.txt"
+  },
+  "wikipedia": {
+    "count": 19,
+    "chars": 21821,
+    "file": "/home/sergio/Project/llm-cpp/data/malagasy/processed/wikipedia.txt"
+  },
+  "combined": {
+    "count": 1768,
+    "chars": 2384161,
+    "file": "/home/sergio/Project/llm-cpp/data/malagasy/processed/input.txt",
+    "root_file": "/home/sergio/Project/llm-cpp/data/input.txt"
+  },
+  "total": {
+    "chars": 2384161,
+    "words": 364235,
+    "docs": 1768
+  },
+  "augmented_mg": {
+    "chars": 4107863,
+    "docs": 27470,
+    "file": "data/malagasy/processed/augmented_mg.txt",
+    "note": "EDA augmentation 2x Malagasy"
+  },
+  "combined_enhanced_v2": {
+    "chars": 7766541,
+    "words": 1229857,
+    "docs": 59491,
+    "file": "data/input.txt"
+  },
+  "total_enhanced_v2": {
+    "chars": 7766541,
+    "words": 1229857
+  },
+  "shakespeare": {
+    "chars": 1115394,
+    "words": 202651,
+    "file": "data/malagasy/processed/shakespeare.txt"
+  }
+}
