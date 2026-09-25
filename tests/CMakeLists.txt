@@ -196,6 +196,8 @@ add_test(NAME mamba_state COMMAND test_mamba_state)
 
 add_executable(test_mamba_model test_mamba_model.cpp ../src/model.cpp ../src/gpu_weights.cpp ../src/mamba.cpp ../src/mamba_scan.cpp ../src/mamba_state.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/gguf.cpp ../src/checkpoint.cpp ../src/utils.cpp ../src/profiling.cpp ../src/pool.cpp)
 add_test(NAME mamba_model COMMAND test_mamba_model)
+add_executable(test_mamba_backward test_mamba_backward.cpp ../src/model.cpp ../src/gpu_weights.cpp ../src/mamba.cpp ../src/mamba_scan.cpp ../src/mamba_state.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/loss.cpp ../src/utils.cpp ../src/profiling.cpp ../src/pool.cpp)
+add_test(NAME mamba_backward COMMAND test_mamba_backward)
 add_executable(test_gpu_weights test_gpu_weights.cpp ../src/gpu_weights.cpp ../src/tensor.cpp)
 add_test(NAME gpu_weights COMMAND test_gpu_weights)
 add_executable(test_gpu_integration test_gpu_integration.cpp ../src/model.cpp ../src/mamba.cpp ../src/mamba_scan.cpp ../src/mamba_state.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/utils.cpp ../src/gpu_weights.cpp ../src/profiling.cpp ../src/pool.cpp)

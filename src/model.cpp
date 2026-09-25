@@ -174,8 +174,77 @@ void GPT::zero_grad() {
 }
 void GPT::backward(const Tensor& dlogits, const std::vector<int>& tokens, const Tensor& hidden) {
     size_t T = dlogits.shape[0];
-    // M4: backward not implemented for MAMBA path yet
-    if (config_.use_mamba) return;
+    if (config_.use_mamba) {
+        // Mamba path: same head/norm/embed logic as below, blocks are MambaBlocks.
+        Tensor dW_lm({hidden.shape[1], dlogits.shape[1]}, 0.0f);
+        for (size_t i = 0; i < hidden.shape[1]; ++i)
+            for (size_t j = 0; j < dlogits.shape[1]; ++j) {
+                float acc = 0;
+                for (size_t t = 0; t < T; ++t) acc += hidden(t, i) * dlogits(t, j);
+                dW_lm(i, j) = acc;
+            }
+        const_cast<Tensor&>(lm_head_).add_grad(dW_lm);
+        if (config_.weight_tying) {
+            Tensor dWte_t({wte_.shape[0], wte_.shape[1]}, 0.0f);
+            for (size_t i = 0; i < wte_.shape[0]; ++i)
+                for (size_t j = 0; j < wte_.shape[1]; ++j) dWte_t(i, j) = dW_lm(j, i);
+            const_cast<Tensor&>(wte_).add_grad(dWte_t);
+        }
+        Tensor dHidden({T, hidden.shape[1]}, 0.0f);
+        for (size_t t = 0; t < T; ++t)
+            for (size_t i = 0; i < hidden.shape[1]; ++i) {
+                float acc = 0;
+                for (size_t j = 0; j < dlogits.shape[1]; ++j) acc += dlogits(t, j) * lm_head_(i, j);
+                dHidden(t, i) = acc;
+            }
+        Tensor x({T, config_.n_embd}, 0.0f);
+        for (size_t t = 0; t < T; ++t) {
+            int tok_clamped = ((tokens[t] % (int)config_.vocab_size) + (int)config_.vocab_size) %
+                              (int)config_.vocab_size;
+            for (size_t j = 0; j < config_.n_embd; ++j) x(t, j) = wte_(tok_clamped, j) + wpe_(t, j);
+        }
+        if (config_.pos_encoding == PosEncoding::RoPE) x = rope_cfg(x, T, config_);
+        for (auto& blk : mamba_blocks_) x = blk.forward(x);
+        Tensor dX;
+        if (config_.use_rmsnorm) {
+            auto rb = x.rmsnorm_backward(dHidden, &ln_f_gamma_);
+            dX = rb.grad_x;
+            const_cast<Tensor&>(ln_f_gamma_).add_grad(rb.grad_w);
+        } else {
+            auto ln_bwd = x.layernorm_backward(dHidden, &ln_f_gamma_);
+            dX = ln_bwd.grad_x;
+            const_cast<Tensor&>(ln_f_gamma_).add_grad(ln_bwd.grad_gamma);
+            const_cast<Tensor&>(ln_f_beta_).add_grad(ln_bwd.grad_beta);
+        }
+        std::vector<Tensor> block_inputs;
+        block_inputs.reserve(mamba_blocks_.size() + 1);
+        Tensor cur({T, config_.n_embd}, 0.0f);
+        for (size_t t = 0; t < T; ++t) {
+            int tok_clamped = ((tokens[t] % (int)config_.vocab_size) + (int)config_.vocab_size) %
+                              (int)config_.vocab_size;
+            for (size_t j = 0; j < config_.n_embd; ++j)
+                cur(t, j) = wte_(tok_clamped, j) + wpe_(t, j);
+        }
+        if (config_.pos_encoding == PosEncoding::RoPE) cur = rope_cfg(cur, T, config_);
+        block_inputs.push_back(cur);
+        for (auto& blk : mamba_blocks_) {
+            cur = blk.forward(cur);
+            block_inputs.push_back(cur);
+        }
+        for (int i = (int)mamba_blocks_.size() - 1; i >= 0; --i) {
+            dX = mamba_blocks_[i].backward(block_inputs[i], dX);
+        }
+        for (size_t t = 0; t < T; ++t) {
+            int tok = tokens[t];
+            int tok_clamped =
+                ((tok % (int)config_.vocab_size) + (int)config_.vocab_size) % (int)config_.vocab_size;
+            for (size_t j = 0; j < config_.n_embd; ++j) {
+                const_cast<Tensor&>(wte_).grad[tok_clamped * config_.n_embd + j] += dX(t, j);
+                const_cast<Tensor&>(wpe_).grad[t * config_.n_embd + j] += dX(t, j);
+            }
+        }
+        return;
+    }
     // grad for lm_head: hidden^T * dlogits
     Tensor dW_lm({hidden.shape[1], dlogits.shape[1]}, 0.0f);
     for (size_t i = 0; i < hidden.shape[1]; ++i)
