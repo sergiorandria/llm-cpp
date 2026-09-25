@@ -92,14 +92,23 @@ option(USE_CUDA "Use CUDA backend for matmul (requires CUDAToolkit)" OFF)
 if(USE_CUDA)
     find_package(CUDAToolkit QUIET)
     if(CUDAToolkit_FOUND)
-        target_link_libraries(llm-cpp PRIVATE CUDA::cudart CUDA::cublas)
+        if(NOT CMAKE_CUDA_ARCHITECTURES)
+            set(CMAKE_CUDA_ARCHITECTURES native)  # auto-detect (e.g. sm_75 on GTX 1650)
+        endif()
+        enable_language(CUDA)
+        # M8: CUDA scan kernel as a static lib so every target that compiles
+        # mamba_scan.cpp (llm-cpp, tests/, benches) links the definition of
+        # selective_scan_cuda exactly once.
+        add_library(llm_mamba_cuda STATIC src/mamba_scan_cuda.cu)
+        target_link_libraries(llm_mamba_cuda PRIVATE CUDA::cudart)
+        target_link_libraries(llm-cpp PRIVATE llm_mamba_cuda CUDA::cudart CUDA::cublas)
         target_compile_definitions(llm-cpp PRIVATE USE_CUDA=1 NP_ENABLE_CUDA=1)
         # Propagate to targets defined below (llm-c-api, tests/, benches):
         # they compile tensor.cpp/backend.cpp too and must agree on USE_CUDA.
         # NP_ENABLE_CUDA lets numpy-cpp use real CUDA types + its cuBLAS path
         # instead of dlopen stubs (avoids header conflicts with <cublas_v2.h>).
         add_compile_definitions(USE_CUDA=1 NP_ENABLE_CUDA=1)
-        link_libraries(CUDA::cudart CUDA::cublas)
+        link_libraries(llm_mamba_cuda CUDA::cudart CUDA::cublas)
         message(STATUS "llm-cpp: USE_CUDA enabled — cublas")
     else()
         message(WARNING "USE_CUDA=ON but CUDAToolkit not found — staying on CPU")

@@ -49,6 +49,66 @@ int main() {
         }
     }
 
+    // Chunk-boundary + randomized equivalence: the chunked associative path
+    // must match the single-pass reference for uneven splits and non-trivial
+    // inputs (covers T={33,129} dispatch-style boundaries and nonzero h0).
+    {
+        unsigned rng = 0x1234567u;
+        auto rnd = [&]() {
+            rng = rng * 1664525u + 1013904223u;
+            return (float)(rng >> 8) / (float)(1u << 24) - 0.5f;
+        };
+        for (size_t TT : {33, 129}) {
+            size_t DD = 16, NN = 4;
+            std::vector<float> xx(TT * DD), AA(DD * NN), BB(TT * NN), CC(TT * NN),
+                dd(TT * DD), Ds(DD), hh(DD * NN);
+            for (auto& v : xx) v = rnd();
+            for (auto& v : AA) v = -0.5f + 0.5f * rnd();
+            for (auto& v : BB) v = rnd();
+            for (auto& v : CC) v = rnd();
+            for (auto& v : dd) v = 0.05f + 0.05f * (rnd() + 0.5f);
+            for (auto& v : Ds) v = rnd();
+            for (auto& v : hh) v = 0.1f * rnd();
+            std::vector<float> ys(TT * DD), yp(TT * DD);
+            llm::selective_scan_sequential(xx, AA, BB, CC, dd, Ds, hh, ys, TT, DD, NN);
+            llm::selective_scan_parallel(xx, AA, BB, CC, dd, Ds, hh, yp, TT, DD, NN);
+            float md = 0;
+            for (size_t i = 0; i < TT * DD; ++i)
+                md = std::max(md, std::abs(ys[i] - yp[i]));
+            if (!(md < 1e-4f)) {
+                std::cerr << "FAIL: T=" << TT << " par-vs-seq maxdiff=" << md << "\n";
+                return 1;
+            }
+        }
+    }
+
+    // Explicit CUDA-kernel parity (only compiled with USE_CUDA=ON): the kernel
+    // must execute on-device (no silent CPU fallback here) and match the CPU
+    // reference. Under CPU builds this block does not exist.
+#ifdef USE_CUDA
+    {
+        size_t TT = 16, DD = 32, NN = 8;
+        std::vector<float> xx(TT * DD, 0.5f), AA(DD * NN, -0.7f), BB(TT * NN, 0.2f),
+            CC(TT * NN, 0.9f), dd(TT * DD, 0.05f), Ds(DD, 0.5f), hh(DD * NN, 0.1f);
+        std::vector<float> yg(TT * DD, 0.0f), yr(TT * DD, 0.0f);
+        bool on_device = llm::selective_scan_cuda(xx.data(), AA.data(), BB.data(), CC.data(),
+                                                  dd.data(), Ds.data(), hh.data(), yg.data(),
+                                                  TT, DD, NN);
+        if (!on_device) {
+            std::cerr << "FAIL: selective_scan_cuda fell back despite CUDA build+GPU\n";
+            return 1;
+        }
+        llm::selective_scan_parallel(xx, AA, BB, CC, dd, Ds, hh, yr, TT, DD, NN);
+        float md = 0;
+        for (size_t i = 0; i < TT * DD; ++i) md = std::max(md, std::abs(yg[i] - yr[i]));
+        if (!(md < 1e-4f)) {
+            std::cerr << "FAIL: CUDA kernel vs CPU maxdiff=" << md << "\n";
+            return 1;
+        }
+        std::cout << "cuda kernel parity maxdiff=" << md << "\n";
+    }
+#endif
+
     std::cout << "test_mamba_scan passed\n";
     return 0;
 }

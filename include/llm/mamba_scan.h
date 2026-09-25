@@ -32,4 +32,12 @@ void selective_scan_parallel(
     std::vector<float>& y,
     size_t T, size_t D, size_t N);
 
+#ifdef USE_CUDA
+// CUDA entry point (src/mamba_scan_cuda.cu, linked only with USE_CUDA=ON).
+// Returns false when no device / N > 64 / any CUDA error (caller: CPU fallback).
+bool selective_scan_cuda(const float* x, const float* A, const float* B, const float* C,
+                         const float* dt, const float* D_skip, const float* h0, float* y,
+                         size_t T, size_t D, size_t N);
+#endif
+
 }  // namespace llm
