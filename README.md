@@ -57,7 +57,7 @@ Implementation of a Large Language Model (LLM) from scratch in C++.
 cmake -B build -DCMAKE_BUILD_TYPE=Release -DUSE_NUMPY_CPP=ON -DBUILD_TESTS=ON
 cmake --build build -j
 ./build/llm-cpp --help
-ctest --test-dir build  # 31/31 including kv_cache_per_layer
+ctest --test-dir build  # 91/91 (CPU + CUDA builds; sanitizers clean)
 ./build/tests/test_numpy_backend  # demo: matmul, randn, transpose via np
 # Autotune Flash block
 python3 scripts/autotune_flash.py  # → include/llm/flash_config.h + docs/BENCHMARK_DASHBOARD.md
