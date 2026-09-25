@@ -9,6 +9,8 @@ GPUWeights::~GPUWeights() { clear(); }
 
 void GPUWeights::upload(const std::vector<Tensor>& params) {
     clear();
+    shapes_.reserve(params.size());
+    for (auto& p : params) shapes_.push_back(p.shape);
 #ifdef USE_CUDA
     int n = 0;
     if (cudaGetDeviceCount(&n) != cudaSuccess || n == 0) {
@@ -21,11 +23,16 @@ void GPUWeights::upload(const std::vector<Tensor>& params) {
         sizes_[i] = params[i].data.size();
         size_t bytes = sizes_[i] * sizeof(float);
         void* d = nullptr;
-        if (cudaMalloc(&d, bytes) == cudaSuccess) {
-            cudaMemcpy(d, params[i].data.data(), bytes, cudaMemcpyHostToDevice);
-            d_ptrs_[i] = d;
-        } else {
+        if (bytes == 0) continue;
+        if (cudaMalloc(&d, bytes) != cudaSuccess) {
             cpu_tensors_.push_back(params[i]);
+            continue;
+        }
+        if (cudaMemcpy(d, params[i].data.data(), bytes, cudaMemcpyHostToDevice) != cudaSuccess) {
+            cudaFree(d);
+            cpu_tensors_.push_back(params[i]);
+        } else {
+            d_ptrs_[i] = d;
         }
     }
 #else
@@ -35,19 +42,34 @@ void GPUWeights::upload(const std::vector<Tensor>& params) {
 
 void GPUWeights::download(std::vector<Tensor>& params) const {
 #ifdef USE_CUDA
-    params.resize(d_ptrs_.size() + cpu_tensors_.size());
-    size_t idx = 0;
-    for (size_t i = 0; i < d_ptrs_.size(); ++i) {
-        if (!d_ptrs_[i]) continue;
-        params[idx] = Tensor({sizes_[i]}, 0.0f);
-        cudaMemcpy(params[idx].data.data(), d_ptrs_[i], sizes_[i] * sizeof(float),
-                   cudaMemcpyDeviceToHost);
-        ++idx;
+    // Order-preserving: params[i] corresponds to upload index i; entries that
+    // fell back to CPU come from cpu spill in upload order. Reconstruct by
+    // walking upload order: device ptr if present, else next CPU spill tensor.
+    // Spill order matches upload index order, so this is exact.
+    params.clear();
+    params.reserve(shapes_.size());
+    size_t spill = 0;
+    // Count spills to sanity-check; cpu_tensors_ holds exactly the fallbacks.
+    for (size_t i = 0; i < shapes_.size(); ++i) {
+        bool on_device = (i < d_ptrs_.size() && d_ptrs_[i] != nullptr);
+        if (on_device) {
+            Tensor t(shapes_[i], 0.0f);
+            if (cudaMemcpy(t.data.data(), d_ptrs_[i], sizes_[i] * sizeof(float),
+                           cudaMemcpyDeviceToHost) != cudaSuccess) {
+                // Fall back to CPU spill if still available, else zeros.
+                if (spill < cpu_tensors_.size())
+                    t = cpu_tensors_[spill++];
+                else
+                    t.fill(0.0f);
+            }
+            params.push_back(std::move(t));
+        } else {
+            if (spill < cpu_tensors_.size())
+                params.push_back(cpu_tensors_[spill++]);
+            else
+                params.emplace_back(shapes_[i], 0.0f);
+        }
     }
-    for (size_t i = 0; i < cpu_tensors_.size(); ++i) {
-        params[idx++] = cpu_tensors_[i];
-    }
-    params.resize(idx);
 #else
     params = cpu_tensors_;
 #endif
@@ -87,6 +109,7 @@ void GPUWeights::clear() {
 #endif
     d_ptrs_.clear();
     sizes_.clear();
+    shapes_.clear();
     cpu_tensors_.clear();
 }
 

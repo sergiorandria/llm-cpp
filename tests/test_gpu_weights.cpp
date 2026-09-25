@@ -26,14 +26,25 @@ int main() {
         std::cerr << "FAIL: download size should be 2, got " << out.size() << "\n";
         return 1;
     }
-    if (out[0].data[0] != 1.0f) {
-        std::cerr << "FAIL: expected 1.0f, got " << out[0].data[0] << "\n";
+    // Shapes must survive the roundtrip (2D stays 2D — old code flattened to 1D).
+    if (out[0].shape.size() != 2 || out[0].shape[0] != 4 || out[0].shape[1] != 4) {
+        std::cerr << "FAIL: out[0] shape not preserved\n";
         return 1;
     }
-    if (out[1].data[0] != 2.0f) {
-        std::cerr << "FAIL: expected 2.0f, got " << out[1].data[0] << "\n";
+    if (out[1].shape.size() != 1 || out[1].shape[0] != 4) {
+        std::cerr << "FAIL: out[1] shape not preserved\n";
         return 1;
     }
+    for (float v : out[0].data)
+        if (v != 1.0f) {
+            std::cerr << "FAIL: expected 1.0f, got " << v << "\n";
+            return 1;
+        }
+    for (float v : out[1].data)
+        if (v != 2.0f) {
+            std::cerr << "FAIL: expected 2.0f, got " << v << "\n";
+            return 1;
+        }
 
     // Device pointer access (GPU only)
     if (gw.device_ptr(0)) {

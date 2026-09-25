@@ -16,9 +16,10 @@ public:
     size_t count() const;
     void clear();
 
-private:
+ private:
     std::vector<void*> d_ptrs_;
     std::vector<size_t> sizes_;
+    std::vector<std::vector<size_t>> shapes_;  // per-param shapes (download restores them)
     std::vector<Tensor> cpu_tensors_;
 };
 
