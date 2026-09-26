@@ -1,0 +1,5 @@
+{"question": "What is 2 + 2?", "choices": ["3", "4", "5", "6"], "answer": 1, "subject": "elementary_mathematics"}
+{"question": "Which planet is known as the Red Planet?", "choices": ["Venus", "Mars", "Jupiter", "Saturn"], "answer": 1, "subject": "astronomy"}
+{"question": "What do plants absorb from the air for photosynthesis?", "choices": ["Oxygen", "Nitrogen", "Carbon dioxide", "Hydrogen"], "answer": 2, "subject": "biology"}
+{"question": "How many days are there in a leap year?", "choices": ["365", "366", "367", "364"], "answer": "B", "subject": "general"}
+{"question": "Which ocean is the largest?", "choices": ["Atlantic", "Indian", "Arctic", "Pacific"], "answer": 3, "subject": "geography"}

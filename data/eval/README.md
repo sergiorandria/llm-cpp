@@ -1,0 +1,38 @@
+# Eval samples — MMLU / HellaSwag (real multiple-choice)
+
+Tiny handcrafted samples in the authentic upstream field shapes so the
+loader and log-likelihood choice scoring (`llm/eval.h`) are exercised on
+real files. A random-init model scores ~chance here — these samples test
+*wiring*, not model quality.
+
+## Formats
+
+**MMLU** (`mmlu_sample.jsonl`, one object per line — HF `cais/mmlu` shape):
+```json
+{"question": "...", "choices": ["...", "...", "...", "..."], "answer": 1, "subject": "..."}
+```
+`answer` accepts an int index or a letter `"A"`–`"D"`. Extra keys ignored.
+
+**HellaSwag** (`hellaswag_sample.jsonl` — HF `Rowan/hellaswag` shape):
+```json
+{"ctx": "...", "endings": ["...", "...", "...", "..."], "label": 0}
+```
+`ctx_a`/`ctx_b` pairs are joined with a space when `ctx` is absent.
+The last line of the sample is intentionally malformed (bad label) to
+exercise the loader's skip path (`n_skipped`).
+
+## Scoring
+
+`choice_loglik(model, ctx, choice)` = sum of choice-token log-probs from a
+single forward pass over `ctx + choice` (choice never truncated; context
+truncates left). Accuracy = fraction of items where the argmax-choice
+matches the label (`pick_best`, first on ties).
+
+## Using full datasets
+
+Drop full JSONL files anywhere and point the loaders at them:
+`load_mmlu_jsonl(path)`, `load_hellaswag_jsonl(path)`. Texts are encoded
+with your own tokenizer (`Tokenizer::train` + `encode`); ids are clamped
+into the model vocab at scoring time. Full upstream sets need an HF-capable
+tokenizer alignment for comparable numbers — see `test_eval_mc.cpp` for the
+intended pipeline.

@@ -202,5 +202,8 @@ add_executable(test_gpu_weights test_gpu_weights.cpp ../src/gpu_weights.cpp ../s
 add_test(NAME gpu_weights COMMAND test_gpu_weights)
 add_executable(test_gpu_integration test_gpu_integration.cpp ../src/model.cpp ../src/mamba.cpp ../src/mamba_scan.cpp ../src/mamba_state.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/utils.cpp ../src/gpu_weights.cpp ../src/profiling.cpp ../src/pool.cpp)
 add_test(NAME gpu_integration COMMAND test_gpu_integration)
+add_executable(test_eval_mc test_eval_mc.cpp ../src/eval.cpp ../src/model.cpp ../src/gpu_weights.cpp ../src/mamba.cpp ../src/mamba_scan.cpp ../src/mamba_state.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/loss.cpp ../src/utils.cpp ../src/profiling.cpp ../src/pool.cpp)
+add_test(NAME eval_mc COMMAND test_eval_mc)
+set_tests_properties(eval_mc PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_executable(test_train_mamba test_train_mamba.cpp ../src/model.cpp ../src/gpu_weights.cpp ../src/mamba.cpp ../src/mamba_scan.cpp ../src/mamba_state.cpp ../src/attention.cpp ../src/tensor.cpp ../src/transformer.cpp ../src/tokenizer.cpp ../src/sampling.cpp ../src/kv_cache.cpp ../src/trainer.cpp ../src/dataset.cpp ../src/optimizer.cpp ../src/scheduler.cpp ../src/loss.cpp ../src/flash_attention.cpp ../src/fused.cpp ../src/layernorm.cpp ../src/utils.cpp ../src/profiling.cpp ../src/pool.cpp)
 add_test(NAME train_mamba COMMAND test_train_mamba)
