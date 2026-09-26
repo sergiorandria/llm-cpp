@@ -39,11 +39,25 @@ int init_threading() {
     }
 #ifdef _OPENMP
     if (want > 0) omp_set_num_threads(want);
+    // I89 pathology: our parallel-for regions calling into threaded kernels
+    // (numpy/OpenBLAS micro-GEMMs) oversubscribe — measured 87x slower with
+    // default threads on a tiny model (12 vs 1078 tok/s). Cap nesting at 1
+    // (inner regions run serially; outer parallelism kept) unless the user
+    // explicitly configured nesting. Must run outside any parallel region.
+    if (!std::getenv("OMP_MAX_ACTIVE_LEVELS") && !std::getenv("OMP_NESTED"))
+        omp_set_max_active_levels(1);
     return omp_get_max_threads();
 #else
     (void)want;
     return 1;
 #endif
+}
+
+// Test hook: reports whether nesting would be capped (pure env logic,
+// usable without OpenMP). Returns 1 if a cap applies, 0 if user overrode.
+int nesting_capped_default() {
+    if (std::getenv("OMP_MAX_ACTIVE_LEVELS") || std::getenv("OMP_NESTED")) return 0;
+    return 1;
 }
 std::string simd_caps() {
     std::string s;

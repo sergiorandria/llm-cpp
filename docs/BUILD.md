@@ -25,6 +25,9 @@ default. Expect ≥1.5× 1→4 threads on 512² `bench_matmul`; pin with
 
 > I89 finding: on SMALL models (≤64 embd) nested OpenMP (our loops × numpy-cpp
 > micro-GEMMs) oversubscribes — 12 threads measured **~160× slower** (0.37 vs
-> 59 tok/s). Always run inference/bench with `OMP_NUM_THREADS=1` unless the
-> model is large enough that GEMMs dominate thread overhead. The bench gate
-> (`.github/workflows/bench.yml`) pins threads=1 for this reason.
+> 59 tok/s), reproduced on bench box at 87× (12 vs 1078 tok/s).
+> `init_threading()` now caps nesting at 1 by default (inner kernels run
+> serially, outer parallelism kept) — unpinned bench went 12 → 452 tok/s.
+> Override with `OMP_MAX_ACTIVE_LEVELS`/`OMP_NESTED` if you know better.
+> For max small-model throughput still pin `OMP_NUM_THREADS=1` (1078 tok/s);
+> the bench gate (`.github/workflows/bench.yml`) pins threads=1 for this reason.

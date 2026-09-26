@@ -21,7 +21,7 @@ green** (plus `pybind`), sanitizer-relevant fuzz clean, benches recorded.
 ## Measured numbers (this box)
 
 - Overfit: Shakespeare-200 loss 5.10 → 0.04 (100 steps, 6.8 s)
-- Infer: 352.6 tok/s (tiny 2L/64e, OMP_NUM_THREADS=1; 0.37 tok/s default threads — pin threads)
+- Infer: 352.6 tok/s (tiny 2L/64e, OMP_NUM_THREADS=1); default threads now capped at 1 nesting level (was 0.37 tok/s via oversubscription — fixed, measures 452 tok/s unpinned on bench box; pin to 1 for max)
 - Speculative tiny-scale speedup 0.39 (2× claim needs draft ≪ target)
 - Int8 ppl drift 8e-6 (gate <5%); Q8 GGUF err 0.0003; 2:4 prune ppl 2.7024→2.7029
 - Flash-vs-naive 7e-8; paged≡contiguous 0.0; resume 5+5 ≡ 10 bit-exact
