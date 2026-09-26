@@ -156,12 +156,22 @@ static bool extract_int(const std::string& line, const std::string& key, int& va
     if (p == std::string::npos) return false;
     size_t i = p + 1;
     while (i < line.size() && line[i] == ' ') ++i;
-    if (i < line.size() && line[i] == '"') {  // letter form: "A".."Z"
+    if (i < line.size() && line[i] == '"') {  // quoted form: "A".."Z" or "0".."3"
         if (i + 1 < line.size() && line[i + 1] >= 'A' && line[i + 1] <= 'Z' && line[i + 2] == '"') {
             val = line[i + 1] - 'A';
             return true;
         }
-        return false;
+        size_t q = line.find('"', i + 1);  // digit string, e.g. HF Rowan/hellaswag "3"
+        if (q == std::string::npos) return false;
+        try {
+            size_t len = 0;
+            int v = std::stoi(line.substr(i + 1, q - i - 1), &len);
+            if (len == 0 || len != q - i - 1) return false;
+            val = v;
+            return true;
+        } catch (...) {
+            return false;
+        }
     }
     try {
         size_t len = 0;

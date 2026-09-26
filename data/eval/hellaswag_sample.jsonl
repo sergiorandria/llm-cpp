@@ -4,4 +4,5 @@
 {"ctx": "The dog fetches the ball and", "endings": ["brings it back to its owner.", "buries it on Mars.", "solves a math problem.", "writes a novel."], "label": 0}
 {"ctx": "To make tea, first boil water, then", "endings": ["pour it over the tea leaves.", "freeze it into cubes.", "pour it on the floor.", "drink the kettle."], "label": 0}
 {"ctx_a": "A woman pours flour into a bowl.", "ctx_b": "Next she", "endings": ["adds sugar and stirs.", "drives to the store.", "takes a nap.", "calls the police."], "label": 0}
+{"ctx": "The baby laughs when the dog", "endings": ["barks loudly.", "reads a book.", "drives away.", "falls asleep."], "label": "0"}
 {"not_a_context": 1, "endings": ["a", "b"], "label": 5}

@@ -50,7 +50,8 @@ int main() {
     CHECK(mmlu[3].answer == 1, "letter answer B not parsed to 1");
     CHECK(mmlu[0].choices.size() == 4, "mmlu choices count");
     auto hs = load_hellaswag_jsonl("data/eval/hellaswag_sample.jsonl", &skipped);
-    CHECK(hs.size() == 6, "hellaswag sample count");
+    CHECK(hs.size() == 7, "hellaswag sample count");
+    CHECK(hs[6].answer == 0, "digit-string label not parsed");
     CHECK(skipped == 1, "hellaswag malformed line not skipped");
     CHECK(hs[5].context == "A woman pours flour into a bowl. Next she", "ctx_a/b join wrong");
     auto missing = load_mmlu_jsonl("data/eval/does_not_exist.jsonl", &skipped);
@@ -98,7 +99,7 @@ int main() {
         GPT model(cfg);
         MCScore sm = score_mc_items(model, m_items);
         MCScore sh = score_mc_items(model, h_items);
-        CHECK(sm.scored == 5 && sh.scored == 6, "not all items scored");
+        CHECK(sm.scored == 5 && sh.scored == 7, "not all items scored");
         CHECK(sm.accuracy >= 0 && sm.accuracy <= 1, "mmlu accuracy out of range");
         CHECK(sh.accuracy >= 0 && sh.accuracy <= 1, "hs accuracy out of range");
         MCScore sm2 = score_mc_items(model, m_items);
