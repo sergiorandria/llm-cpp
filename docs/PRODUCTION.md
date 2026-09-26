@@ -31,7 +31,7 @@ green** (plus `pybind`), sanitizer-relevant fuzz clean, benches recorded.
 - CPU-only (CUDA abstraction present, kernels not yet; `backend_name()=="cpu"`)
 - Single-node, single-process (data-parallel = in-process mean-reduce)
 - Eval: EN TinyStories/Shakespeare + Malagasy corpus; MMLU/HellaSwag are token-accuracy proxies
-- Q4_K super-blocks deferred (Q4_0 + Q8_0 shipped); GGUF Q-scales are F32 super-scales
+- Q4_K super-blocks shipped (144B ggml-layout blocks, fp16 d/dmin, 4.5 bits/wt; centered-block err 0.03); Q4_0/Q8_0 keep F32 super-scales
 - numpy-cpp upstream ships NO LICENSE file (THIRD_PARTY.md exception; follow-up filed)
 - Release-mode `assert()` is NDEBUG-elided: tests use hoisted calls; Debug/ASAN CI gives real checking
 - Docker image build ~25 min+ (tag CI only, not per-push)

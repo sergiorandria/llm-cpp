@@ -1,7 +1,9 @@
 #include "llm/gguf.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -14,7 +16,9 @@ static constexpr uint32_t GGUF_VERSION = 3;
 static constexpr uint32_t GGUF_DTYPE_F32 = 0;
 static constexpr uint32_t GGUF_DTYPE_Q4_0 = 2;  // ggml type id, block 32 nibbles + F32 scale
 static constexpr uint32_t GGUF_DTYPE_Q8_0 = 8;  // ggml type id, block 32 int8 + F32 scale
+static constexpr uint32_t GGUF_DTYPE_Q4_K = 12;  // ggml type id, 256-elem super-blocks (144B)
 static constexpr size_t GGUF_QBLK = 32;
+static constexpr size_t GGUF_Q4K_BLK = 256;
 static constexpr size_t GGUF_ALIGN = 32;
 static constexpr uint32_t GGUF_TYPE_STRING = 8;
 
@@ -84,11 +88,193 @@ void decode_q40_block(float scale, const uint8_t* packed, float* out) {
     }
 }
 
-// Encoded size of a tensor with n floats under dtype tag
+// ── Q4_K super-block codec ──
+static uint16_t f32_to_f16(float v) {
+    uint32_t b = 0;
+    memcpy(&b, &v, sizeof(b));
+    uint32_t sign = (b >> 16) & 0x8000u;
+    int exp = int((b >> 23) & 0xFFu) - 127 + 15;
+    uint32_t mant = b & 0x7FFFFFu;
+    if (exp >= 31) return (uint16_t)(sign | 0x7BFFu);  // inf/nan -> inf
+    if (exp <= 0) {
+        if (exp < -10) return (uint16_t)sign;  // underflow to signed zero
+        mant |= 0x800000u;
+        uint32_t shift = (uint32_t)(1 - exp);
+        uint32_t half = mant >> shift;
+        uint32_t rest = mant & ((shift >= 32) ? 0xFFFFFFFFu : ((1u << shift) - 1u));
+        uint32_t halfway = 1u << (shift - 1);
+        if (rest > halfway || (rest == halfway && (half & 1u))) ++half;
+        return (uint16_t)(sign | (half & 0x3FFu));
+    }
+    uint32_t half = mant >> 13;
+    uint32_t rest = mant & 0x1FFFu;
+    if (rest > 0x1000u || (rest == 0x1000u && (half & 1u))) {
+        ++half;
+        if (half == 0x400u) {
+            half = 0;
+            if (++exp >= 31) return (uint16_t)(sign | 0x7BFFu);
+        }
+    }
+    return (uint16_t)(sign | ((uint32_t)exp << 10) | half);
+}
+
+static float f16_to_f32(uint16_t h) {
+    uint32_t sign = ((uint32_t)h & 0x8000u) << 16;
+    int exp = ((h >> 10) & 0x1Fu);
+    uint32_t mant = (uint32_t)(h & 0x3FFu);
+    uint32_t b;
+    if (exp == 0) {
+        if (mant == 0) {
+            b = sign;  // signed zero
+        } else {
+            // subnormal: normalize
+            exp = 1;
+            while (!(mant & 0x400u)) {
+                mant <<= 1;
+                --exp;
+            }
+            mant &= 0x3FFu;
+            b = sign | ((uint32_t)(exp + 112) << 23) | (mant << 13);
+        }
+    } else if (exp == 31) {
+        b = sign | 0x7F800000u | (mant << 13);  // inf/nan
+    } else {
+        b = sign | ((uint32_t)(exp + 112) << 23) | (mant << 13);
+    }
+    float v = 0;
+    memcpy(&v, &b, sizeof(v));
+    return v;
+}
+
+// Unpack one (sc, mn) 6-bit pair for sub-block j (ggml get_scale_min_k4 order)
+static void q4k_unpack_scales(const uint8_t* scales, int j, uint8_t& sc, uint8_t& mn) {
+    if (j < 4) {
+        sc = scales[j] & 63;
+        mn = scales[j + 4] & 63;
+    } else {
+        sc = (scales[j + 4] & 0xF) | ((scales[j - 4] >> 6) << 4);
+        mn = (scales[j + 4] >> 4) | ((scales[j] >> 6) << 4);
+    }
+}
+
+void encode_q4k_block(const float* x, uint8_t* out144) {
+    // out144 layout: d f16 [0:2], dmin f16 [2:4], scales[12] [4:16], qs[128] [16:144]
+    float mn[8], mx[8];
+    // Non-finite super-block -> emit zeros (documented; never silently NaN)
+    bool finite = true;
+    for (int i = 0; i < 256; ++i)
+        if (!std::isfinite(x[i])) {
+            finite = false;
+            break;
+        }
+    for (int j = 0; j < 8; ++j) {
+        mn[j] = finite ? x[32 * j] : 0.0f;
+        mx[j] = finite ? x[32 * j] : 0.0f;
+        for (int l = 1; l < 32 && finite; ++l) {
+            float v = x[32 * j + l];
+            if (v < mn[j]) mn[j] = v;
+            if (v > mx[j]) mx[j] = v;
+        }
+    }
+    float sc_true[8];
+    float dall_anchor = 0;
+    if (finite) {
+        for (int j = 0; j < 8; ++j) {
+            sc_true[j] = (mx[j] - mn[j]) / 15.0f;
+            dall_anchor = std::max(dall_anchor, sc_true[j]);
+        }
+    } else {
+        for (int j = 0; j < 8; ++j) {
+            mn[j] = 0;
+            sc_true[j] = 0;
+        }
+    }
+    float dall = dall_anchor / 63.0f;
+    // Min anchor: max(-mn) when some sub-min is negative, else -max(mn)
+    // (exact for single-sign-min blocks; see header docs).
+    float neg_max = 0;  // max(-mn) over j with mn<0, else 0
+    float pos_max = 0;  // max(mn) over j with mn>=0
+    for (int j = 0; j < 8; ++j) {
+        if (mn[j] < 0)
+            neg_max = std::max(neg_max, -mn[j]);
+        else
+            pos_max = std::max(pos_max, mn[j]);
+    }
+    float dmin_anchor = (neg_max > 0) ? neg_max : -pos_max;  // 0 iff all mn==0
+    float dmin = dmin_anchor / 63.0f;
+    uint8_t qsc[8], qmn[8];
+    for (int j = 0; j < 8; ++j) {
+        qsc[j] = (dall_anchor > 0) ? (uint8_t)std::max(0.0f, std::min(63.0f,
+                                          std::round(63.0f * sc_true[j] / dall_anchor)))
+                                   : 0;
+        qmn[j] = (dmin_anchor != 0) ? (uint8_t)std::max(0.0f, std::min(63.0f,
+                                           std::round(63.0f * (-mn[j]) / dmin_anchor)))
+                                    : 0;
+    }
+    out144[0] = (uint8_t)(f32_to_f16(dall) & 0xFF);
+    out144[1] = (uint8_t)(f32_to_f16(dall) >> 8);
+    out144[2] = (uint8_t)(f32_to_f16(dmin) & 0xFF);
+    out144[3] = (uint8_t)(f32_to_f16(dmin) >> 8);
+    uint8_t* scales = out144 + 4;
+    for (int j = 0; j < 4; ++j) {
+        scales[j] = (qsc[j] & 63) | ((qsc[j + 4] >> 4) << 6);
+        scales[j + 4] = (qmn[j] & 63) | ((qmn[j + 4] >> 4) << 6);
+        scales[8 + j] = (qsc[j + 4] & 0xF) | ((qmn[j + 4] & 0xF) << 4);
+    }
+    // Quantize values against the QUANTIZED scales/mins (what dequant uses)
+    float dall_f = f16_to_f32(f32_to_f16(dall));
+    float dmin_f = f16_to_f32(f32_to_f16(dmin));
+    uint8_t* qs = out144 + 16;
+    for (int i = 0; i < 128; ++i) qs[i] = 0;
+    for (int i = 0; i < 256; ++i) {
+        int j = i / 32;
+        float dj = dall_f * (float)qsc[j];
+        float dmj = dmin_f * (float)qmn[j];
+        int q = 0;
+        if (dj != 0) {
+            q = (int)std::round((x[i] + dmj) / dj);
+            q = std::max(0, std::min(15, q));
+        }
+        int il = i / 64, in = i % 64;
+        int b = 32 * il + (in & 31);
+        if (in < 32)
+            qs[b] |= (uint8_t)q;
+        else
+            qs[b] |= (uint8_t)(q << 4);
+    }
+}
+
+void decode_q4k_block(const uint8_t* in144, float* out) {
+    uint16_t dh = (uint16_t)in144[0] | ((uint16_t)in144[1] << 8);
+    uint16_t mh = (uint16_t)in144[2] | ((uint16_t)in144[3] << 8);
+    float dall = f16_to_f32(dh);
+    float dmin = f16_to_f32(mh);
+    const uint8_t* scales = in144 + 4;
+    const uint8_t* qs = in144 + 16;
+    for (int i = 0; i < 256; ++i) {
+        int il = i / 64, in = i % 64;
+        int j = 2 * il + (in >= 32 ? 1 : 0);
+        uint8_t sc, mn;
+        q4k_unpack_scales(scales, j, sc, mn);
+        int b = 32 * il + (in & 31);
+        int q = (in < 32) ? (qs[b] & 0xF) : (qs[b] >> 4);
+        out[i] = dall * (float)sc * (float)q - dmin * (float)mn;
+    }
+}
+
+// Encoded size of a tensor with n floats under dtype tag (n pre-padded)
 static size_t gguf_nbytes(size_t n, uint32_t dtype) {
     if (dtype == GGUF_DTYPE_Q8_0) return (n / GGUF_QBLK) * (4 + GGUF_QBLK);
     if (dtype == GGUF_DTYPE_Q4_0) return (n / GGUF_QBLK) * (4 + GGUF_QBLK / 2);
+    if (dtype == GGUF_DTYPE_Q4_K) return (n / GGUF_Q4K_BLK) * 144;
     return n * sizeof(float);
+}
+
+// Pad length for a dtype's block size
+static size_t gguf_pad_len(size_t n, uint32_t dtype) {
+    size_t blk = (dtype == GGUF_DTYPE_Q4_K) ? GGUF_Q4K_BLK : GGUF_QBLK;
+    if (dtype == GGUF_DTYPE_F32) return n;
+    return n + ((blk - n % blk) % blk);
 }
 
 static void write_encoded(std::ofstream& out, const Tensor& t, uint32_t dtype) {
@@ -106,6 +292,14 @@ static void write_encoded(std::ofstream& out, const Tensor& t, uint32_t dtype) {
             encode_q80_block(padded.data() + b, sc, q);
             out.write((char*)&sc, 4);
             out.write((char*)q, GGUF_QBLK);
+        }
+    } else if (dtype == GGUF_DTYPE_Q4_K) {
+        std::vector<float> padded4k(t.data.begin(), t.data.end());
+        while (padded4k.size() % GGUF_Q4K_BLK) padded4k.push_back(0.0f);
+        for (size_t b = 0; b < padded4k.size(); b += GGUF_Q4K_BLK) {
+            uint8_t blk[144];
+            encode_q4k_block(padded4k.data() + b, blk);
+            out.write((char*)blk, 144);
         }
     } else {  // Q4_0
         for (size_t b = 0; b < padded.size(); b += GGUF_QBLK) {
@@ -125,6 +319,18 @@ static bool read_decoded(std::ifstream& in, Tensor& t, uint32_t dtype, size_t ab
     if (dtype == GGUF_DTYPE_F32) {
         in.read((char*)t.data.data(), n * sizeof(float));
         return (size_t)in.gcount() == n * sizeof(float);
+    }
+    if (dtype == GGUF_DTYPE_Q4_K) {
+        size_t padded = gguf_pad_len(n, dtype);
+        std::vector<float> buf(padded);
+        for (size_t b = 0; b < padded; b += GGUF_Q4K_BLK) {
+            uint8_t blk[144];
+            in.read((char*)blk, 144);
+            if (in.fail()) return false;
+            decode_q4k_block(blk, buf.data() + b);
+        }
+        for (size_t i = 0; i < n; ++i) t.data[i] = buf[i];
+        return true;
     }
     size_t padded = n + ((GGUF_QBLK - n % GGUF_QBLK) % GGUF_QBLK);
     std::vector<float> buf(padded);
@@ -296,6 +502,8 @@ bool save_gguf_quant(const GPT& model, const std::string& path, int qtype) {
         dtype = GGUF_DTYPE_Q8_0;
     else if (qtype == 4)
         dtype = GGUF_DTYPE_Q4_0;
+    else if (qtype == 12)
+        dtype = GGUF_DTYPE_Q4_K;
     {
         size_t slash = path.find_last_of("/\\");
         if (slash != std::string::npos) std::filesystem::create_directories(path.substr(0, slash));
@@ -339,8 +547,7 @@ bool save_gguf_quant(const GPT& model, const std::string& path, int qtype) {
         Info info;
         info.name = "tensor_" + std::to_string(i);
         for (auto d : params[i]->shape) info.dims.push_back((uint64_t)d);
-        size_t padded =
-            params[i]->data.size() + ((GGUF_QBLK - params[i]->data.size() % GGUF_QBLK) % GGUF_QBLK);
+        size_t padded = gguf_pad_len(params[i]->data.size(), dtype);
         info.nbytes = (dtype == GGUF_DTYPE_F32) ? params[i]->data.size() * sizeof(float)
                                                 : gguf_nbytes(padded, dtype);
         infos.push_back(std::move(info));
@@ -459,7 +666,7 @@ bool load_gguf(GPT& model, const std::string& path) {
                 return false;
             }
             if (info.dtype != GGUF_DTYPE_F32 && info.dtype != GGUF_DTYPE_Q8_0 &&
-                info.dtype != GGUF_DTYPE_Q4_0) {
+                info.dtype != GGUF_DTYPE_Q4_0 && info.dtype != GGUF_DTYPE_Q4_K) {
                 std::cerr << "[gguf] load: unsupported dtype " << info.dtype << "\n";
                 return false;
             }
